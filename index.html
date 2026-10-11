@@ -161,7 +161,11 @@ kbd{font:11px ui-monospace,monospace;background:var(--sec);border:1px solid var(
 
 <!-- Окно калибровки -->
 <div id="calib" class="modal" hidden><div class="mbox">
-  <h2>Калибровка экрана</h2>
+  <h2>Размер экрана</h2>
+  <div class="status good" id="calAuto" style="background:var(--accs);color:var(--ink)"></div>
+  <div class="row" style="margin-top:0"><button id="calPaste">Вставить данные монитора</button>
+    <select id="calMac" style="width:auto"></select></div>
+  <h3 style="font-size:14px;margin:16px 0 4px">Проверка и точная подгонка</h3>
   <p class="hint" id="calText"></p>
   <div class="row"><select id="calRef" style="width:auto">
     <option value="card">Банковская карта 85,60 × 53,98 мм</option>
@@ -171,14 +175,14 @@ kbd{font:11px ui-monospace,monospace;background:var(--sec);border:1px solid var(
   <input id="calSlider" type="range" min="1.5" max="12" step="0.001">
   <div class="row"><button data-cal="-1">− точнее</button><button data-cal="1">+ точнее</button><span id="calInfo" class="hint"></span></div>
   <div class="row">Или диагональ экрана: <input id="calDiag" type="number" step="0.1" placeholder="27" style="width:80px"> дюймов <button id="calDiagBtn">Рассчитать</button></div>
-  <div class="row" style="justify-content:flex-end;margin-top:16px"><button id="calCancel">Отмена</button><button id="calSave" class="primary">Сохранить</button></div>
+  <div class="row" style="justify-content:flex-end;margin-top:16px"><button id="calReset" hidden style="margin-right:auto">Сбросить ручную подгонку</button><button id="calCancel">Отмена</button><button id="calSave" class="primary">Сохранить</button></div>
 </div></div>
 
 <!-- Справка -->
 <div id="help" class="modal" hidden><div class="mbox" style="max-width:640px">
   <h2>Как пользоваться</h2>
   <ol>
-    <li><b>Калибровка (один раз).</b> «Калибровка» → приложите карту к экрану → ползунком совместите рамку с картой → «Сохранить».</li>
+    <li><b>Размер экрана (один раз).</b> Запустите <b>detect-screen</b> из папки программы — размер считается прямо из монитора. Для проверки приложите карту в окне «Калибровка».</li>
     <li><b>Объект.</b> Введите размеры товара (Д × Ш × В) → «Добавить». При виде «Спереди», ортографической камере и масштабе 1:1 передняя грань на экране точно равна реальной.</li>
     <li><b>Сравнение.</b> Поставьте рядом знакомый предмет: телефон, лист А4, банку колы.</li>
     <li><b>Осмотр.</b> Левая кнопка мыши — вращать, правая (или <kbd>Shift</kbd>) — двигать, колесо — зум (<kbd>R</kbd> вернёт 1:1).</li>
@@ -199,6 +203,8 @@ kbd{font:11px ui-monospace,monospace;background:var(--sec);border:1px solid var(
   <div class="row" style="justify-content:flex-end"><button id="helpClose" class="primary">Понятно</button></div>
 </div></div>
 
+<!-- Данные монитора от утилиты detect-screen (если файла нет — ничего страшного) -->
+<script src="screen-data.js" onerror="void 0"></script>
 <script>
 'use strict';
 /* =====================================================================
@@ -224,15 +230,47 @@ const S = {
   W: 0, H: 0
 };
 
-/* Калибровка хранится как «CSS-пикселей на мм» при определённом devicePixelRatio.
-   Если пользователь меняет зум браузера/масштаб ОС, devicePixelRatio меняется —
-   и мы автоматически пересчитываем. */
-let calib = load(LS_CAL);
+/* =====================================================================
+   ОПРЕДЕЛЕНИЕ ФИЗИЧЕСКОГО РАЗМЕРА ЭКРАНА
+   Источники (по приоритету):
+   1) ручная калибровка по карте/линейке — хранится отдельно для каждого монитора;
+   2) EDID — точный размер панели в мм из прошивки монитора. Его читает утилита
+      detect-screen (браузеру прямой доступ к EDID запрещён) и передаёт сюда
+      через файл screen-data.js или буфер обмена (Ctrl+V);
+   3) модель экрана из встроенной таблицы (Mac) — выбирается в окне калибровки;
+   4) стандарт CSS 96 dpi — неточно, только как запасной вариант.
+   Ключевая формула: CSS-пикселей на мм = screen.width (CSS px) / ширина панели (мм).
+   Она не зависит ни от масштаба Windows/Mac, ни от зума браузера.
+   ===================================================================== */
+const LS_CALS = 'r11.calibs', LS_EDID = 'r11.edid';
 const win = () => cv.ownerDocument.defaultView || window;   // окно, где сейчас холст (обычное или «поверх всех»)
-function pxmm() {
-  const d = win().devicePixelRatio || 1;
-  return calib ? calib.v * calib.dpr / d : 96 / 25.4;       // 96 dpi — стандарт CSS, обычно неточен
+let calibs = load(LS_CALS) || {};                          // { "2560x1440": {v, dpr, src, name} }
+let edid = Array.isArray(window.SCREEN_EDID) ? window.SCREEN_EDID : (load(LS_EDID) || []);
+if (Array.isArray(window.SCREEN_EDID)) save(LS_EDID, edid);
+function scr() {
+  const w = win(), d = w.devicePixelRatio || 1, s = w.screen;
+  return { d, cw: s.width, ch: s.height, nw: Math.round(s.width * d), nh: Math.round(s.height * d) };
 }
+const scrKey = () => { const s = scr(); return s.nw + 'x' + s.nh; };
+/* Какая запись EDID соответствует экрану, на котором сейчас окно */
+function matchEdid() {
+  const s = scr(), near = (a, b) => Math.abs(a - b) <= 2;
+  const ok = e => e && e.w > 50 && e.h > 30 && e.x > 0 && e.y > 0;
+  let c = edid.filter(e => ok(e) && ((near(e.x, s.nw) && near(e.y, s.nh)) || (near(e.x, s.cw) && near(e.y, s.ch))));
+  if (!c.length) c = edid.filter(e => ok(e) && Math.abs(e.x / e.y - s.cw / s.ch) < 0.01); // масштабированный режим
+  if (new Set(c.map(e => e.w + 'x' + e.h)).size > 1) return null;                   // неоднозначно — не гадаем
+  return c[0] || null;
+}
+/* Проверка достоверности EDID: пропорции мм должны совпадать с пропорциями пикселей */
+const edidSane = e => Math.abs((e.w / e.h) / (e.x / e.y) - 1) < 0.03;
+function screenInfo() {
+  const s = scr(), m = calibs[scrKey()];
+  if (m) return { v: m.v * m.dpr / s.d, src: m.src || 'card', name: m.name };
+  const e = matchEdid();
+  if (e && edidSane(e)) return { v: s.cw / e.w, src: 'edid', name: e.n, e };
+  return { v: 96 / 25.4, src: 'none', bad: e && !edidSane(e) ? e : null };
+}
+function pxmm() { return screenInfo().v; }
 function load(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }
 function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
 
@@ -524,7 +562,7 @@ function drawMeasure() {
 }
 function updateHud() {
   const h = [];
-  if (!calib) h.push('<div class="warn">⚠ Экран не откалиброван — нажмите «Калибровка»</div>');
+  if (screenInfo().src === 'none') h.push('<div class="warn">⚠ Размер экрана не определён — нажмите «Калибровка»</div>');
   if (Math.abs(S.zoom - 1) < 1e-3) h.push('<div>Масштаб 1:1 ✓</div>');
   else h.push(`<div class="warn">Зум ×${S.zoom.toFixed(2)} — не 1:1 (R — сброс)</div>`);
   h.push(S.persp ? '<div class="warn">Перспектива искажает размеры</div>' : '<div>Ортографическая камера</div>');
@@ -774,16 +812,31 @@ $('#btnImg').onclick = () => $('#fImg').click();
 $('#fImg').onchange = e => setImage(e.target.files[0]);
 $('#btnImgDel').onclick = () => { S.bg.img = null; redraw(); };
 $('#fImgOp').oninput = e => { S.bg.op = +e.target.value; redraw(); };
-document.addEventListener('paste', e => { const it = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith('image/')); if (it) setImage(it.getAsFile()); });
+document.addEventListener('paste', e => { if (importScreenData(e.clipboardData?.getData('text'))) return; const it = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith('image/')); if (it) setImage(it.getAsFile()); });
 document.addEventListener('dragover', e => e.preventDefault());
 document.addEventListener('drop', e => { e.preventDefault(); setImage(e.dataTransfer.files[0]); });
 
 /* =====================================================================
    10. КАЛИБРОВКА
    ===================================================================== */
-let calV = pxmm();
+let calV = pxmm(), calSrc = null;
+/* Встроенные экраны Mac: [название, диагональ ″, пикселей по ширине, по высоте] */
+const MAC = [
+  ['MacBook Air 13,3″ (2018–2020)', 13.3, 2560, 1600], ['MacBook Air 13,6″ (M2–M4)', 13.6, 2560, 1664],
+  ['MacBook Air 15,3″', 15.3, 2880, 1864], ['MacBook Pro 13,3″', 13.3, 2560, 1600],
+  ['MacBook Pro 14,2″', 14.2, 3024, 1964], ['MacBook Pro 15,4″', 15.4, 2880, 1800],
+  ['MacBook Pro 16″ (2019)', 16, 3072, 1920], ['MacBook Pro 16,2″', 16.2, 3456, 2234],
+  ['iMac 24″', 23.5, 4480, 2520], ['iMac 27″ 5K', 27, 5120, 2880],
+  ['Apple Studio Display 27″', 27, 5120, 2880], ['Apple Pro Display XDR 32″', 32, 6016, 3384],
+];
+const macWidthMm = m => m[2] * m[1] * 25.4 / Math.hypot(m[2], m[3]);
 function openCalib() {
-  calV = pxmm(); $('#calSlider').value = calV; drawCalib(); $('#calib').hidden = false;
+  calV = pxmm(); calSrc = null; $('#calSlider').value = calV;
+  const ar = screen.width / screen.height;   // подходящие по пропорциям модели — первыми
+  const fit = MAC.map((m, i) => [m, i]).sort((a, b) => Math.abs(a[0][2] / a[0][3] - ar) - Math.abs(b[0][2] / b[0][3] - ar));
+  $('#calMac').innerHTML = '<option value="">— выбрать модель —</option>' +
+    fit.map(([m, i]) => `<option value="${i}">${m[0]}${Math.abs(m[2] / m[3] - ar) < 0.01 ? ' ✓ подходит' : ''}</option>`).join('');
+  drawCalib(); $('#calib').hidden = false;
 }
 function drawCalib() {
   const ref = $('#calRef').value, card = $('#calCard'), rul = $('#calRuler');
@@ -795,25 +848,69 @@ function drawCalib() {
   $('#calText').textContent = ref === 'card'
     ? 'Приложите банковскую карту к рамке (левый верхний угол к углу) и двигайте ползунок, пока рамка не совпадёт с краями карты.'
     : 'Приложите линейку: расстояние между крайними чертами должно быть ровно 10 см. Длинные риски — каждый сантиметр.';
-  const diag = Math.hypot(screen.width, screen.height) / calV / 25.4;
-  $('#calInfo').textContent = `${calV.toFixed(3)} px/мм · экран ≈ ${diag.toFixed(1)}″ по диагонали`;
+  const w = screen.width / calV, h = screen.height / calV;
+  $('#calInfo').textContent = `${calV.toFixed(3)} px/мм · экран ${(w / 10).toFixed(1)} × ${(h / 10).toFixed(1)} см (${(Math.hypot(w, h) / 25.4).toFixed(1)}″)`;
+  // блок автоопределения
+  const si = screenInfo(), e = matchEdid();
+  $('#calAuto').innerHTML = e && edidSane(e)
+    ? `✓ Данные монитора получены: <b>${esc(e.n || 'монитор')}</b>, панель ${(e.w / 10).toFixed(1)} × ${(e.h / 10).toFixed(1)} см, ${e.x}×${e.y}.`
+      + (si.src !== 'edid' ? ' Сейчас используется ручная калибровка.' : ' Используются автоматически.')
+    : e ? '⚠ Монитор сообщил недостоверный размер (пропорции не сходятся) — используйте карту.'
+    : edid.length ? '⚠ Данные мониторов есть, но этот экран среди них не найден (или выбран не родной режим). Запустите утилиту ещё раз.'
+    : 'Для максимальной точности запустите утилиту <b>detect-screen</b> из папки программы — она прочитает размер панели прямо из монитора (EDID). Затем нажмите здесь <kbd>Ctrl</kbd>+<kbd>V</kbd>.';
+  $('#calReset').hidden = !calibs[scrKey()];
 }
-$('#calSlider').oninput = e => { calV = +e.target.value; drawCalib(); };
-document.querySelectorAll('[data-cal]').forEach(b => b.onclick = () => { calV *= 1 + 0.001 * b.dataset.cal; $('#calSlider').value = calV; drawCalib(); });
+$('#calSlider').oninput = e => { calV = +e.target.value; calSrc = 'card'; drawCalib(); };
+document.querySelectorAll('[data-cal]').forEach(b => b.onclick = () => { calV *= 1 + 0.001 * b.dataset.cal; calSrc = 'card'; $('#calSlider').value = calV; drawCalib(); });
 $('#calRef').onchange = drawCalib;
 $('#calDiagBtn').onclick = () => {   // из диагонали: CSS-пикселей по диагонали / (дюймы × 25.4)
-  const d = parseFloat($('#calDiag').value); if (!(d > 0)) return;
-  calV = Math.hypot(screen.width, screen.height) / (d * 25.4); $('#calSlider').value = calV; drawCalib();
+  const d = parseFloat(String($('#calDiag').value).replace(',', '.')); if (!(d > 0)) return;
+  calV = Math.hypot(screen.width, screen.height) / (d * 25.4); calSrc = 'diag'; $('#calSlider').value = calV; drawCalib();
+};
+$('#calMac').onchange = e => {
+  const m = MAC[e.target.value]; if (!m) return;
+  calV = screen.width / macWidthMm(m); calSrc = 'model:' + m[0]; $('#calSlider').value = calV; drawCalib();
+};
+$('#calReset').onclick = () => { delete calibs[scrKey()]; save(LS_CALS, calibs); calV = pxmm(); $('#calSlider').value = calV; updateCalStatus(); drawCalib(); redraw(); };
+$('#calPaste').onclick = async () => {
+  try { importScreenData(await navigator.clipboard.readText()); }
+  catch { alert('Браузер не дал доступ к буферу. Просто нажмите Ctrl+V в этом окне.'); }
 };
 $('#calCancel').onclick = () => $('#calib').hidden = true;
-$('#calSave').onclick = () => { calib = { v: calV, dpr: window.devicePixelRatio || 1 }; save(LS_CAL, calib); $('#calib').hidden = true; updateCalStatus(); redraw(); };
+$('#calSave').onclick = () => {
+  if (calSrc) { // сохраняем только если пользователь действительно что-то подгонял
+    const src = calSrc.startsWith('model:') ? 'model' : calSrc;
+    calibs[scrKey()] = { v: calV, dpr: scr().d, src, name: calSrc.startsWith('model:') ? calSrc.slice(6) : '' };
+    save(LS_CALS, calibs);
+  }
+  $('#calib').hidden = true; updateCalStatus(); redraw();
+};
 $('#btnCalib').onclick = openCalib;
-function updateCalStatus() {
-  const el = $('#calStatus');
-  el.className = 'status ' + (calib ? 'good' : 'bad');
-  el.textContent = calib ? `✓ Откалибровано: ${pxmm().toFixed(3)} px/мм` : '⚠ Не откалибровано — размеры могут быть неточными. Нажмите «Калибровка».';
+/* Импорт данных от утилиты detect-screen: строка вида R11:[{"n":"DELL U2720Q","w":597,"h":336,"x":3840,"y":2160}] */
+function importScreenData(text) {
+  const m = String(text || '').trim().match(/^R11:(\[.*\])$/s); if (!m) return false;
+  try { const arr = JSON.parse(m[1]); if (!Array.isArray(arr)) return false;
+    edid = arr; save(LS_EDID, edid);
+    delete calibs[scrKey()]; save(LS_CALS, calibs);       // свежие данные монитора важнее старой ручной подгонки
+    calV = pxmm(); $('#calSlider').value = calV;
+    updateCalStatus(); if (!$('#calib').hidden) drawCalib(); redraw();
+    const e = matchEdid();
+    alert(e ? `Готово! Монитор «${e.n || 'без имени'}»: ${(e.w / 10).toFixed(1)} × ${(e.h / 10).toFixed(1)} см. Масштаб 1:1 настроен автоматически.`
+            : `Получены данные ${arr.length} монитор(ов), но текущий экран не распознан. Убедитесь, что в системе выбрано рекомендуемое разрешение.`);
+    return true;
+  } catch { return false; }
 }
-
+function updateCalStatus() {
+  const el = $('#calStatus'), si = screenInfo(), s = scr();
+  const size = `${(s.cw / si.v / 10).toFixed(1)} × ${(s.ch / si.v / 10).toFixed(1)} см`;
+  el.className = 'status ' + (si.src === 'none' ? 'bad' : 'good');
+  el.innerHTML = si.src === 'edid' ? `✓ Определено автоматически по данным монитора «${esc(si.name || '?')}»: экран ${size}`
+    : si.src === 'card' ? `✓ Откалибровано вручную: экран ${size}`
+    : si.src === 'model' ? `✓ Модель «${esc(si.name)}»: экран ${size}`
+    : si.src === 'diag' ? `✓ По диагонали: экран ${size}. Для точности до мм уточните по карте.`
+    : si.bad ? '⚠ Монитор сообщил неверный размер. Откалибруйте по карте.'
+    : '⚠ Размер экрана не определён. Нажмите «Калибровка» — там есть автоопределение.';
+}
 /* =====================================================================
    11. РЕЖИМ «ПОВЕРХ ВСЕХ ОКОН» (Document Picture-in-Picture, Chrome/Edge 116+)
    Холст переносится в маленькое окно, которое всегда остаётся над браузером.
@@ -839,8 +936,9 @@ $('#btnPip').onclick = async () => {
    ===================================================================== */
 window.addEventListener('resize', redraw);
 window.matchMedia && setInterval(() => { /* следим за сменой зума браузера/монитора */
-  const d = win().devicePixelRatio; if (d !== S._dpr) { S._dpr = d; updateCalStatus(); redraw(); } }, 700);
+  const k = scrKey() + '/' + win().devicePixelRatio + '/' + win().screen.width; if (k !== S._scr) { S._scr = k; updateCalStatus(); redraw(); } }, 700);
 (function init() {
+  const old = load(LS_CAL); if (old && !Object.keys(calibs).length) { calibs[scrKey()] = { ...old, src: 'card' }; save(LS_CALS, calibs); }
   const sc = load(LS_SCENE);
   if (sc && sc.unit) $('#fUnit').value = sc.unit;
   if (sc && sc.objs && sc.objs.length) {
@@ -854,7 +952,7 @@ window.matchMedia && setInterval(() => { /* следим за сменой зу�
   ['#fL', '#fW', '#fH'].forEach((s, i) => $(s).value = fromMm([150, 100, 80][i]));
   $('#fExtH').value = fromMm(50);
   layout(); renderList(); updateCalStatus(); redraw();
-  if (!calib) setTimeout(openCalib, 400);   // первый запуск — сразу калибровка
+  if (screenInfo().src === 'none') setTimeout(openCalib, 400);   // первый запуск — сразу калибровка
 })();
 </script>
 </body>
