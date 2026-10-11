@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Размер 1:1 — реальные размеры на экране</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<!--
+  «Размер 1:1» — программа в одном файле, без установки и без интернета.
+  Показывает объекты в реальном масштабе на экране монитора.
+  Технологии: чистый HTML + CSS + JavaScript (Canvas 2D), без библиотек.
+  Запуск: двойной клик по файлу (лучше в Chrome / Edge).
+-->
+<style>
+:root{--ink:#2C2C2B;--mut:#7D7A75;--bg:#F9F8F7;--panel:#fff;--line:#E6E5E3;--sec:#F0EFED;--acc:#2783DE;--accs:#E5F2FC;--warn:#D5803B;--warns:#FBEBDE;--ok:#46A171}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;font:13px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--ink);background:var(--bg)}
+#app{display:flex;height:100%}
+#side{width:310px;flex:none;overflow:auto;background:var(--panel);border-right:1px solid var(--line);padding:14px 14px 30px}
+body.compact #side{display:none}
+#wrap{position:relative;flex:1;min-width:0;background:#fff}
+body.pip #wrap{position:fixed;inset:0}
+#cv{position:absolute;inset:0;width:100%;height:100%;display:block;cursor:grab;touch-action:none}
+#cv.draw,#cv.measure{cursor:crosshair}
+h1{font-size:17px;margin:0 0 2px}
+.sub{color:var(--mut);margin:0 0 12px}
+details{border-top:1px solid var(--line);padding:8px 0}
+summary{font-weight:600;cursor:pointer;padding:2px 0;list-style:none}
+summary::before{content:"▸ ";color:var(--mut)}details[open] summary::before{content:"▾ "}
+label{display:block;color:var(--mut);font-size:12px;margin:6px 0 2px}
+input,select,button{font:inherit;color:inherit}
+input[type=number],input[type=text],select{width:100%;padding:5px 7px;border:1px solid var(--line);border-radius:6px;background:#fff}
+input[type=color]{width:36px;height:30px;border:1px solid var(--line);border-radius:6px;padding:2px;background:#fff}
+input[type=range]{width:100%}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.row{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-top:8px}
+button{padding:6px 10px;border:1px solid var(--line);border-radius:6px;background:#fff;cursor:pointer}
+button:hover{background:var(--sec)}
+button.primary{background:var(--acc);border-color:var(--acc);color:#fff}
+button.primary:hover{filter:brightness(1.07)}
+button.on{background:var(--accs);border-color:var(--acc);color:var(--acc)}
+.hint{color:var(--mut);font-size:12px;margin:4px 0}
+.status{padding:7px 9px;border-radius:6px;font-size:12px;margin-bottom:8px}
+.status.bad{background:var(--warns);color:#8a4b14}.status.good{background:#E8F1EC;color:#2c6b49}
+.obj{display:flex;align-items:center;gap:6px;padding:5px 6px;border-radius:6px;cursor:pointer;border:1px solid transparent}
+.obj:hover{background:var(--bg)}.obj.sel{border-color:var(--acc);background:var(--accs)}
+.obj .sw{width:12px;height:12px;border-radius:3px;flex:none}
+.obj .on{flex:1;min-width:0}.obj .on b{display:block;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.obj small{color:var(--mut)}
+.obj button{padding:2px 6px;font-size:12px}
+kbd{font:11px ui-monospace,monospace;background:var(--sec);border:1px solid var(--line);border-radius:4px;padding:0 4px}
+.keys td{padding:1px 4px;vertical-align:top}
+#hud{position:absolute;top:30px;right:10px;display:flex;flex-direction:column;align-items:flex-end;gap:4px;pointer-events:none}
+#hud div{background:rgba(255,255,255,.92);border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-size:12px}
+#hud .warn{background:var(--warns);color:#8a4b14;border-color:#efc9a3}
+#tip{position:absolute;left:32px;bottom:10px;right:10px;color:var(--mut);font-size:12px;pointer-events:none;text-shadow:0 0 3px #fff}
+#fab{position:absolute;top:30px;left:32px;display:flex;gap:4px}
+#fab button{padding:4px 8px;font-size:12px;background:rgba(255,255,255,.92)}
+.modal{position:fixed;inset:0;background:rgba(30,30,30,.35);display:flex;align-items:center;justify-content:center;z-index:10}
+.modal[hidden]{display:none}
+.mbox{background:#fff;border-radius:12px;padding:20px 22px;max-width:min(860px,96vw);max-height:96vh;overflow:auto;box-shadow:0 10px 40px rgba(0,0,0,.2)}
+.mbox h2{margin:0 0 6px;font-size:18px}
+#calStage{margin:14px 0;min-height:120px;display:flex;align-items:flex-start}
+#calCard{border:2px solid var(--acc);border-radius:3.2mm;background:linear-gradient(135deg,#E5F2FC,#cfe3f7);position:relative}
+#calCard::after{content:"";position:absolute;left:12%;top:36%;width:14%;height:20%;border-radius:3px;background:#e6c770;opacity:.8}
+#calRuler{height:34px;border-bottom:2px solid #333;border-left:2px solid #333;border-right:2px solid #333;background-repeat:repeat-x;background-position:left bottom}
+</style>
+</head>
+<body>
+<div id="app">
+<aside id="side">
+  <h1>📐 Размер 1:1</h1>
+  <p class="sub">Реальные размеры товаров на экране</p>
+  <div id="calStatus" class="status bad"></div>
+  <div class="row" style="margin-top:0"><button id="btnCalib" class="primary">Калибровка</button><button id="btnHelp">Справка</button></div>
+
+  <details open><summary>Новый объект</summary>
+    <label>Форма</label>
+    <select id="fShape">
+      <option value="box">Коробка (параллелепипед)</option>
+      <option value="cyl">Цилиндр</option>
+      <option value="cone">Конус</option>
+      <option value="pyr">Пирамида</option>
+      <option value="sph">Шар / эллипсоид</option>
+    </select>
+    <label>Название</label><input id="fName" type="text" value="Мой объект">
+    <div class="g3">
+      <div><label>Длина</label><input id="fL" type="number" min="0.1" step="any" value="200"></div>
+      <div><label>Ширина</label><input id="fW" type="number" min="0.1" step="any" value="150"></div>
+      <div><label>Высота</label><input id="fH" type="number" min="0.1" step="any" value="100"></div>
+    </div>
+    <p class="hint" id="fHint">Порядок как в магазинах: Д × Ш × В. Длина — влево-вправо, ширина — вглубь, высота — вверх.</p>
+    <div class="row">
+      <select id="fUnit" style="width:auto"><option value="mm">мм</option><option value="cm" selected>см</option></select>
+      <input id="fColor" type="color" value="#5E9FE8">
+      <button id="btnAdd" class="primary">Добавить</button>
+      <button id="btnApply" disabled>Обновить выбранный</button>
+    </div>
+  </details>
+
+  <details open><summary>Сравнить со знакомым предметом</summary>
+    <select id="fPreset"></select>
+    <div class="row"><button id="btnPreset">Поставить рядом</button></div>
+  </details>
+
+  <details open><summary>Объекты на сцене</summary>
+    <div id="list"></div>
+    <div class="row"><button id="btnClear">Очистить всё</button></div>
+  </details>
+
+  <details open><summary>Вид</summary>
+    <div class="row" style="margin-top:2px">
+      <button id="camOrtho" class="on">Ортографическая</button><button id="camPersp">Перспектива</button>
+    </div>
+    <div class="row">
+      <button data-view="front">Спереди</button><button data-view="top">Сверху</button><button data-view="side">Сбоку</button><button data-view="iso">3D</button>
+    </div>
+    <div class="row">
+      <button id="layRow" class="on">В ряд</button><button id="layOver">Наложить друг на друга</button>
+    </div>
+    <label>Прозрачность объектов</label><input id="fAlpha" type="range" min="0.1" max="1" step="0.05" value="0.85">
+    <div class="row">
+      <label style="margin:0;color:var(--ink)"><input id="fGrid" type="checkbox" checked> Сетка</label>
+      <label style="margin:0;color:var(--ink)"><input id="fLabels" type="checkbox" checked> Подписи</label>
+      <label style="margin:0;color:var(--ink)"><input id="fDims" type="checkbox" checked> Размерные линии</label>
+    </div>
+  </details>
+
+  <details open><summary>Инструменты</summary>
+    <div class="row" style="margin-top:2px"><button id="btnDraw">✏️ Начертить контур</button><button id="btnMeasure">📏 Линейка</button></div>
+    <div class="g2">
+      <div><label>Высота вытягивания</label><input id="fExtH" type="number" min="0.1" step="any" value="5"></div>
+      <div><label>Шаг привязки</label><select id="fSnap"><option value="0">нет</option><option value="1">1 мм</option><option value="5" selected>5 мм</option><option value="10">1 см</option></select></div>
+    </div>
+    <p class="hint">Контур: клики по сетке → замкните на первой точке или <kbd>Enter</kbd>. Единицы — как в поле «мм/см».</p>
+  </details>
+
+  <details><summary>Фото товара (подложка)</summary>
+    <p class="hint">Вставьте скриншот товара <kbd>Ctrl</kbd>+<kbd>V</kbd>, перетащите картинку на окно или выберите файл.</p>
+    <div class="row" style="margin-top:2px"><button id="btnImg">Выбрать файл</button><button id="btnImgDel">Убрать</button><input id="fImg" type="file" accept="image/*" hidden></div>
+    <label>Прозрачность фото</label><input id="fImgOp" type="range" min="0.05" max="1" step="0.05" value="0.6">
+    <p class="hint"><kbd>Alt</kbd>+перетаскивание — сдвинуть фото, <kbd>Alt</kbd>+колесо — масштаб.
+    Чтобы фото стало 1:1: возьмите 📏 Линейку, проведите по известному размеру на фото и нажмите «Подогнать фото».</p>
+  </details>
+
+  <details open><summary>Окно</summary>
+    <div class="row" style="margin-top:2px">
+      <button id="btnPip">📌 Поверх всех окон</button><button id="btnCompact">Скрыть панель</button>
+      <button id="btnFull">Полный экран</button><button id="btnPng">Сохранить PNG</button>
+    </div>
+  </details>
+</aside>
+
+<main id="wrap">
+  <canvas id="cv"></canvas>
+  <div id="fab"><button id="fabPanel" title="Панель (H)"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;vertical-align:-1px"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button><button id="fabReset" title="Сбросить вид (R)">1:1</button><button id="fabFit" title="Подогнать фото по линейке" hidden>Подогнать фото</button></div>
+  <div id="hud"></div>
+  <div id="tip"></div>
+</main>
+</div>
+
+<!-- Окно калибровки -->
+<div id="calib" class="modal" hidden><div class="mbox">
+  <h2>Калибровка экрана</h2>
+  <p class="hint" id="calText"></p>
+  <div class="row"><select id="calRef" style="width:auto">
+    <option value="card">Банковская карта 85,60 × 53,98 мм</option>
+    <option value="ruler">Обычная линейка 100 мм</option>
+  </select></div>
+  <div id="calStage"><div id="calCard"></div><div id="calRuler" hidden></div></div>
+  <input id="calSlider" type="range" min="1.5" max="12" step="0.001">
+  <div class="row"><button data-cal="-1">− точнее</button><button data-cal="1">+ точнее</button><span id="calInfo" class="hint"></span></div>
+  <div class="row">Или диагональ экрана: <input id="calDiag" type="number" step="0.1" placeholder="27" style="width:80px"> дюймов <button id="calDiagBtn">Рассчитать</button></div>
+  <div class="row" style="justify-content:flex-end;margin-top:16px"><button id="calCancel">Отмена</button><button id="calSave" class="primary">Сохранить</button></div>
+</div></div>
+
+<!-- Справка -->
+<div id="help" class="modal" hidden><div class="mbox" style="max-width:640px">
+  <h2>Как пользоваться</h2>
+  <ol>
+    <li><b>Калибровка (один раз).</b> «Калибровка» → приложите карту к экрану → ползунком совместите рамку с картой → «Сохранить».</li>
+    <li><b>Объект.</b> Введите размеры товара (Д × Ш × В) → «Добавить». При виде «Спереди», ортографической камере и масштабе 1:1 передняя грань на экране точно равна реальной.</li>
+    <li><b>Сравнение.</b> Поставьте рядом знакомый предмет: телефон, лист А4, банку колы.</li>
+    <li><b>Осмотр.</b> Левая кнопка мыши — вращать, правая (или <kbd>Shift</kbd>) — двигать, колесо — зум (<kbd>R</kbd> вернёт 1:1).</li>
+    <li><b>Поверх браузера.</b> «📌 Поверх всех окон» открывает мини-окно, которое висит над магазином. Или вставьте скриншот товара <kbd>Ctrl</kbd>+<kbd>V</kbd>.</li>
+  </ol>
+  <table class="keys">
+    <tr><td><kbd>1</kbd>–<kbd>4</kbd></td><td>Спереди / Сверху / Сбоку / 3D</td></tr>
+    <tr><td><kbd>R</kbd></td><td>Сбросить вид в 1:1</td></tr>
+    <tr><td><kbd>O</kbd></td><td>Орто / перспектива</td></tr>
+    <tr><td><kbd>D</kbd> / <kbd>M</kbd></td><td>Черчение / линейка, <kbd>Esc</kbd> — выход</td></tr>
+    <tr><td><kbd>Q</kbd> / <kbd>E</kbd></td><td>Повернуть выбранный на 15°</td></tr>
+    <tr><td><kbd>Del</kbd></td><td>Удалить выбранный</td></tr>
+    <tr><td><kbd>L</kbd></td><td>В ряд / наложить</td></tr>
+    <tr><td><kbd>H</kbd></td><td>Скрыть / показать панель</td></tr>
+    <tr><td><kbd>C</kbd></td><td>Калибровка</td></tr>
+  </table>
+  <p class="hint">Важно: зум браузера (<kbd>Ctrl</kbd>+колесо) программа учитывает автоматически, перекалибровка не нужна.</p>
+  <div class="row" style="justify-content:flex-end"><button id="helpClose" class="primary">Понятно</button></div>
+</div></div>
+
+<script>
+'use strict';
+/* =====================================================================
+   1. СОСТОЯНИЕ И НАСТРОЙКИ
+   ===================================================================== */
+const $ = s => document.querySelector(s);
+const cv = $('#cv');
+let ctx = cv.getContext('2d');
+const LS_CAL = 'r11.calib', LS_SCENE = 'r11.scene';
+const EYE = 500;            // расстояние до глаз для перспективы, мм
+const PALETTE = ['#5E9FE8','#EAC26B','#72BC8F','#BF8EDA','#DE9255','#DF84A8','#4FB9C9','#E97366'];
+
+const S = {
+  objs: [], sel: null, nextId: 1,
+  yaw: -0.6, pitch: 0.45, zoom: 1, panX: 0, panY: 0,
+  persp: false, layout: 'row', alpha: 0.85,
+  grid: true, labels: true, dims: true,
+  mode: 'view',                       // view | draw | measure
+  draw: { pts: [], hover: null },
+  measure: null,                      // {a:[x,y], b:[x,y]} в экранных px
+  bg: { img: null, op: 0.6, mpp: 1, x: 0, y: 0 }, // mpp — мм на пиксель картинки
+  tx: 0, ty: 0, tz: 0,                // центр сцены (куда смотрит камера)
+  W: 0, H: 0
+};
+
+/* Калибровка хранится как «CSS-пикселей на мм» при определённом devicePixelRatio.
+   Если пользователь меняет зум браузера/масштаб ОС, devicePixelRatio меняется —
+   и мы автоматически пересчитываем. */
+let calib = load(LS_CAL);
+const win = () => cv.ownerDocument.defaultView || window;   // окно, где сейчас холст (обычное или «поверх всех»)
+function pxmm() {
+  const d = win().devicePixelRatio || 1;
+  return calib ? calib.v * calib.dpr / d : 96 / 25.4;       // 96 dpi — стандарт CSS, обычно неточен
+}
+function load(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }
+function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+
+/* Пресеты: размеры в мм, Д(ось X) × Ш(вглубь, Z) × В(вверх, Y). Плоские вещи стоят «лицом» к экрану. */
+const PRESETS = [
+  ['Смартфон 6,1″ (iPhone 15)', 'box', 71.6, 7.8, 147.6],
+  ['Смартфон 6,7″',               'box', 77.6, 8.3, 160.9],
+  ['Банковская карта',            'box', 85.6, 0.8, 53.98],
+  ['Купюра 5000 ₽',               'box', 157, 0.3, 69],
+  ['Лист А4',                     'box', 210, 0.5, 297],
+  ['Банка колы 0,33 л',           'cyl', 66, 66, 115],
+  ['Бутылка воды 0,5 л',          'cyl', 65, 65, 205],
+  ['Кружка',                      'cyl', 82, 82, 95],
+  ['Батарейка AA',                'cyl', 14.5, 14.5, 50.5],
+  ['Монета 10 ₽',                 'cyl', 22, 22, 2.2],
+  ['Коробка для обуви',           'box', 330, 190, 120],
+  ['Кирпич',                      'box', 250, 120, 65],
+  ['Ноутбук 15,6″ (закрыт)',      'box', 360, 245, 20],
+  ['Футбольный мяч №5',           'sph', 220, 220, 220],
+  ['Теннисный мяч',               'sph', 67, 67, 67],
+];
+
+/* =====================================================================
+   2. ГЕОМЕТРИЯ: построение сеток (вершины + грани)
+   Грань: {i:[индексы вершин], e:null | [1/0 для каждого ребра]} (e — какие рёбра обводить)
+   Ось X — длина, Y — высота (вверх), Z — ширина/глубина (к зрителю). Дно на Y=0.
+   ===================================================================== */
+const range = n => [...Array(n).keys()];
+function meshBox(l, w, h) {
+  const x = l / 2, z = w / 2;
+  const v = [[-x,0,-z],[x,0,-z],[x,0,z],[-x,0,z],[-x,h,-z],[x,h,-z],[x,h,z],[-x,h,z]];
+  const f = [[0,1,2,3],[4,7,6,5],[0,4,5,1],[1,5,6,2],[2,6,7,3],[3,7,4,0]].map(i => ({ i, e: null }));
+  return { v, f };
+}
+function ellipse(rx, rz, n) { return range(n).map(k => { const a = k / n * Math.PI * 2; return [Math.cos(a) * rx, Math.sin(a) * rz]; }); }
+/* Призма из 2D-контура (x,z) высотой h. smooth — не обводить вертикальные рёбра (для цилиндра). */
+function prism(poly, h, smooth) {
+  const n = poly.length, v = [], f = [];
+  poly.forEach(([x, z]) => v.push([x, 0, z]));
+  poly.forEach(([x, z]) => v.push([x, h, z]));
+  f.push({ i: range(n), e: null });
+  f.push({ i: range(n).map(k => n + k).reverse(), e: null });
+  for (let a = 0; a < n; a++) { const b = (a + 1) % n; f.push({ i: [a, b, n + b, n + a], e: smooth ? [1,0,1,0] : null }); }
+  return { v, f };
+}
+/* Основание + вершина (конус и пирамида) */
+function apexMesh(poly, h, smooth) {
+  const n = poly.length, v = poly.map(([x, z]) => [x, 0, z]); v.push([0, h, 0]);
+  const f = [{ i: range(n), e: null }];
+  for (let a = 0; a < n; a++) f.push({ i: [a, (a + 1) % n, n], e: smooth ? [1,0,0] : null });
+  return { v, f };
+}
+function meshSphere(l, w, h) {
+  const LAT = 18, LON = 36, v = [], f = [];
+  for (let i = 0; i <= LAT; i++) {
+    const t = i / LAT * Math.PI, y = (1 - Math.cos(t)) / 2 * h, r = Math.sin(t);
+    for (let j = 0; j < LON; j++) { const a = j / LON * Math.PI * 2; v.push([Math.cos(a) * r * l / 2, y, Math.sin(a) * r * w / 2]); }
+  }
+  for (let i = 0; i < LAT; i++) for (let j = 0; j < LON; j++) {
+    const a = i * LON + j, b = i * LON + (j + 1) % LON;
+    f.push({ i: [a, b, b + LON, a + LON], e: [0,0,0,0] });
+  }
+  return { v, f };
+}
+function buildMesh(o) {
+  const { l, w, h } = o;
+  switch (o.type) {
+    case 'cyl':  return prism(ellipse(l / 2, w / 2, 48), h, true);
+    case 'cone': return apexMesh(ellipse(l / 2, w / 2, 48), h, true);
+    case 'pyr':  return apexMesh([[-l/2,-w/2],[l/2,-w/2],[l/2,w/2],[-l/2,w/2]], h, false);
+    case 'sph':  return meshSphere(l, w, h);
+    case 'ext':  return prism(o.pts, h, false);
+    default:     return meshBox(l, w, h);
+  }
+}
+/* Мировые координаты вершин объекта (поворот вокруг вертикали + сдвиг) */
+function worldVerts(o) {
+  const c = Math.cos(o.rot), s = Math.sin(o.rot);
+  return o.mesh.v.map(([x, y, z]) => [c * x + s * z + o.px, y, -s * x + c * z + o.pz]);
+}
+function bbox(pts) {
+  const b = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity];
+  for (const p of pts) for (let k = 0; k < 3; k++) { if (p[k] < b[k]) b[k] = p[k]; if (p[k] > b[k + 3]) b[k + 3] = p[k]; }
+  return b;
+}
+
+/* Расстановка объектов: в ряд слева направо или все в одной точке (наложение) */
+function layout() {
+  let cur = 0, all = [];
+  for (const o of S.objs) {
+    o.mesh = o.mesh || buildMesh(o);
+    o.px = 0; o.pz = 0;
+    const b = bbox(worldVerts(o));
+    if (S.layout === 'row') { o.px = cur - b[0]; cur += b[3] - b[0] + 30; }
+    else o.px = -(b[0] + b[3]) / 2;
+    o.pz = -(b[2] + b[5]) / 2;
+    all.push(...worldVerts(o));
+  }
+  if (all.length) { const b = bbox(all); S.tx = (b[0] + b[3]) / 2; S.ty = b[4] / 2; S.tz = (b[2] + b[5]) / 2; }
+  else { S.tx = S.ty = S.tz = 0; }
+}
+
+/* =====================================================================
+   3. КАМЕРА И ПРОЕКЦИЯ
+   Ортографическая: 1 мм модели = pxmm() экранных px при зуме 1 — размер не зависит от глубины.
+   ===================================================================== */
+function makeProj() {
+  const cy = Math.cos(S.yaw), sy = Math.sin(S.yaw), cp = Math.cos(S.pitch), sp = Math.sin(S.pitch);
+  const k = pxmm() * S.zoom, ox = S.W / 2 + S.panX, oy = S.H / 2 + S.panY;
+  return p => {
+    const x = p[0] - S.tx, y = p[1] - S.ty, z = p[2] - S.tz;
+    const x1 = cy * x + sy * z, z1 = -sy * x + cy * z;
+    const y2 = cp * y - sp * z1, z2 = sp * y + cp * z1;
+    const f = S.persp ? EYE / Math.max(EYE - z2, EYE * 0.1) : 1;
+    return [ox + x1 * k * f, oy - y2 * k * f, z2, x1, y2];   // экран x, экран y, глубина, вид x, вид y
+  };
+}
+const origin = () => [S.W / 2 + S.panX, S.H / 2 + S.panY];
+function setView(v) {
+  const V = { front: [0, 0], top: [0, Math.PI / 2], side: [-Math.PI / 2, 0], iso: [-0.6, 0.45] }[v];
+  S.yaw = V[0]; S.pitch = V[1]; redraw();
+}
+function resetView() { S.zoom = 1; S.panX = S.panY = 0; setView('front'); }
+
+/* =====================================================================
+   4. ОТРИСОВКА
+   ===================================================================== */
+let dirty = false;
+function redraw() { if (!dirty) { dirty = true; win().requestAnimationFrame(render); } }
+
+function fitCanvas() {
+  const d = win().devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
+  if (cv.width !== Math.round(w * d) || cv.height !== Math.round(h * d)) { cv.width = Math.round(w * d); cv.height = Math.round(h * d); }
+  ctx.setTransform(d, 0, 0, d, 0, 0);
+  S.W = w; S.H = h;
+}
+const hex2rgb = h => [1, 3, 5].map(i => parseInt(h.substr(i, 2), 16));
+const shadeCol = (rgb, s) => `rgb(${rgb.map(c => Math.min(255, Math.round(c * s))).join(',')})`;
+
+function render() {
+  dirty = false;
+  fitCanvas();
+  const { W, H } = S;
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
+  drawBg();
+  if (S.grid) drawGrid();
+
+  // --- 3D: собираем все грани, сортируем от дальних к ближним (алгоритм художника) ---
+  const P = makeProj(), items = [];
+  const L = [-0.35, 0.75, 0.55], ll = Math.hypot(...L);
+  for (const o of S.objs) {
+    const pv = worldVerts(o).map(P); o._pv = pv;
+    for (const f of o.mesh.f) {
+      const idx = f.i, n = idx.length; let d = 0, nx = 0, ny = 0, nz = 0;
+      for (let a = 0; a < n; a++) {                    // нормаль методом Ньюэлла
+        const p = pv[idx[a]], q = pv[idx[(a + 1) % n]];
+        d += p[2];
+        nx += (p[4] - q[4]) * (p[2] + q[2]);
+        ny += (p[2] - q[2]) * (p[3] + q[3]);
+        nz += (p[3] - q[3]) * (p[4] + q[4]);
+      }
+      const nl = Math.hypot(nx, ny, nz) || 1;
+      const lit = 0.58 + 0.42 * Math.abs((nx * L[0] + ny * L[1] + nz * L[2]) / (nl * ll));
+      items.push({ o, f, d: d / n, lit });
+    }
+  }
+  items.sort((a, b) => a.d - b.d);
+  ctx.lineJoin = 'round';
+  for (const it of items) {
+    const { o, f } = it, pv = o._pv, sel = o.id === S.sel;
+    ctx.beginPath();
+    f.i.forEach((vi, k) => k ? ctx.lineTo(pv[vi][0], pv[vi][1]) : ctx.moveTo(pv[vi][0], pv[vi][1]));
+    ctx.closePath();
+    ctx.globalAlpha = S.alpha;
+    ctx.fillStyle = shadeCol(o.rgb, it.lit); ctx.fill();
+    if (S.alpha > 0.97) { ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = 0.6; ctx.stroke(); } // убираем щели между гранями
+    // рёбра
+    ctx.globalAlpha = Math.min(1, S.alpha + 0.35);
+    ctx.strokeStyle = sel ? '#2783DE' : shadeCol(o.rgb, 0.45);
+    ctx.lineWidth = sel ? 2 : 1.2;
+    ctx.beginPath();
+    for (let k = 0; k < f.i.length; k++) {
+      if (f.e && !f.e[k]) continue;
+      const a = pv[f.i[k]], b = pv[f.i[(k + 1) % f.i.length]];
+      ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]);
+    }
+    ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+
+  const selObj = S.objs.find(o => o.id === S.sel);
+  if (S.dims && selObj) drawDims(selObj, P);
+  if (S.labels) for (const o of S.objs) drawLabel(o);
+  if (S.mode === 'draw') drawSketch();
+  if (S.measure) drawMeasure();
+  if (S.grid) drawRulers();
+  updateHud();
+}
+
+/* Сетка 1:1 — миллиметры, сантиметры, 5 и 10 см */
+function drawGrid() {
+  const k = pxmm() * S.zoom, [ox, oy] = origin(), { W, H } = S;
+  const lines = (mm, color, lw) => {
+    const s = mm * k; if (s < 5) return;
+    ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = lw;
+    for (let x = ((ox % s) + s) % s; x < W; x += s) { const X = Math.round(x) + 0.5; ctx.moveTo(X, 0); ctx.lineTo(X, H); }
+    for (let y = ((oy % s) + s) % s; y < H; y += s) { const Y = Math.round(y) + 0.5; ctx.moveTo(0, Y); ctx.lineTo(W, Y); }
+    ctx.stroke();
+  };
+  lines(1, '#F3F2F0', 1); lines(10, '#E6E5E3', 1); lines(50, '#D3D1CD', 1); lines(100, '#B9B6B0', 1);
+}
+/* Линейки сверху и слева (в сантиметрах, ноль — в центре сцены) */
+function drawRulers() {
+  const k = pxmm() * S.zoom, [ox, oy] = origin(), { W, H } = S, R = 22;
+  ctx.fillStyle = 'rgba(255,255,255,.95)'; ctx.fillRect(0, 0, W, R); ctx.fillRect(0, 0, R, H);
+  ctx.strokeStyle = '#7D7A75'; ctx.fillStyle = '#7D7A75'; ctx.lineWidth = 1; ctx.font = '10px system-ui,sans-serif';
+  const labelEvery = k * 10 >= 22 ? 1 : k * 10 >= 9 ? 5 : 10;
+  ctx.beginPath();
+  const mmStep = k >= 3 ? 1 : 10;
+  for (let mm = Math.floor(-ox / k / mmStep) * mmStep; ox + mm * k < W; mm += mmStep) {
+    const x = Math.round(ox + mm * k) + 0.5; if (x < R) continue;
+    const t = mm % 10 === 0 ? 10 : mm % 5 === 0 ? 6 : 3; ctx.moveTo(x, R); ctx.lineTo(x, R - t);
+    if (mm % (10 * labelEvery) === 0) ctx.fillText(mm / 10, x + 2, 10);
+  }
+  for (let mm = Math.floor(-oy / k / mmStep) * mmStep; oy + mm * k < H; mm += mmStep) {
+    const y = Math.round(oy + mm * k) + 0.5; if (y < R) continue;
+    const t = mm % 10 === 0 ? 10 : mm % 5 === 0 ? 6 : 3; ctx.moveTo(R, y); ctx.lineTo(R - t, y);
+    if (mm % (10 * labelEvery) === 0) { ctx.save(); ctx.translate(10, y + 2); ctx.rotate(-Math.PI / 2); ctx.fillText(-mm / 10, 0, 0); ctx.restore(); }
+  }
+  ctx.stroke();
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, R, R); ctx.fillStyle = '#7D7A75'; ctx.fillText('см', 4, 14);
+}
+function drawBg() {
+  const b = S.bg; if (!b.img) return;
+  const k = pxmm() * S.zoom, [ox, oy] = origin(), w = b.img.width * b.mpp * k, h = b.img.height * b.mpp * k;
+  ctx.globalAlpha = b.op; ctx.drawImage(b.img, ox + b.x * k - w / 2, oy + b.y * k - h / 2, w, h); ctx.globalAlpha = 1;
+}
+function tag(text, x, y, color, bg) {
+  ctx.font = '600 12px system-ui,sans-serif';
+  const w = ctx.measureText(text).width + 10;
+  ctx.fillStyle = bg || 'rgba(255,255,255,.92)'; ctx.strokeStyle = color || '#E6E5E3'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x - w / 2, y - 10, w, 20, 5) : ctx.rect(x - w / 2, y - 10, w, 20); ctx.fill(); ctx.stroke();
+  ctx.fillStyle = color || '#2C2C2B'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, x, y + 0.5);
+  ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
+}
+function drawLabel(o) {
+  const pv = o._pv; let minY = Infinity, minX = Infinity, maxX = -Infinity;
+  for (const p of pv) { if (p[1] < minY) minY = p[1]; if (p[0] < minX) minX = p[0]; if (p[0] > maxX) maxX = p[0]; }
+  tag(`${o.name}  ${fmt3(o)}`, (minX + maxX) / 2, minY - 16, o.id === S.sel ? '#2783DE' : '#2C2C2B');
+}
+/* Размерные линии на выбранном объекте: длина, ширина, высота */
+function drawDims(o, P) {
+  const b = bbox(o.mesh.v), c = Math.cos(o.rot), s = Math.sin(o.rot);
+  const w = (x, y, z) => P([c * x + s * z + o.px, y, -s * x + c * z + o.pz]);
+  const A = w(b[0], 0, b[5]), B = w(b[3], 0, b[5]), Hh = w(b[3], b[4], b[5]), Z = w(b[3], 0, b[2]);
+  ctx.setLineDash([5, 4]); ctx.strokeStyle = '#2783DE'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); [[A, B], [B, Hh], [B, Z]].forEach(([p, q]) => { ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]); }); ctx.stroke();
+  ctx.setLineDash([]);
+  const mid = (p, q, t, dy = 0) => { if (Math.hypot(p[0] - q[0], p[1] - q[1]) > 24) tag(t, (p[0] + q[0]) / 2, (p[1] + q[1]) / 2 + dy, '#2783DE'); };
+  mid(A, B, 'Д ' + fmt(b[3] - b[0]), 14); mid(B, Hh, 'В ' + fmt(b[4])); mid(B, Z, 'Ш ' + fmt(b[5] - b[2]));
+}
+/* Черчение контура */
+function drawSketch() {
+  const k = pxmm() * S.zoom, [ox, oy] = origin(), D = S.draw;
+  const scr = p => [ox + p[0] * k, oy + p[1] * k];
+  const pts = D.pts.map(scr), hv = D.hover && scr(D.hover);
+  ctx.strokeStyle = '#2783DE'; ctx.lineWidth = 2; ctx.fillStyle = 'rgba(39,131,222,.12)';
+  if (pts.length) {
+    ctx.beginPath(); pts.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]));
+    if (hv) ctx.lineTo(hv[0], hv[1]);
+    if (pts.length > 2) ctx.fill();
+    ctx.stroke();
+    const segs = D.pts.slice(); if (D.hover) segs.push(D.hover);
+    for (let i = 1; i < segs.length; i++) {
+      const a = segs[i - 1], b2 = segs[i], len = Math.hypot(b2[0] - a[0], b2[1] - a[1]);
+      if (len > 0) { const p = scr(a), q = scr(b2); tag(fmt(len), (p[0] + q[0]) / 2, (p[1] + q[1]) / 2 - 12, '#2783DE'); }
+    }
+  }
+  pts.forEach((p, i) => { ctx.beginPath(); ctx.arc(p[0], p[1], i === 0 && closeEnough() ? 8 : 4, 0, 7); ctx.fillStyle = i === 0 ? '#46A171' : '#2783DE'; ctx.fill(); });
+  if (hv) { ctx.beginPath(); ctx.arc(hv[0], hv[1], 3, 0, 7); ctx.fillStyle = '#2783DE'; ctx.fill(); }
+}
+function drawMeasure() {
+  const { a, b } = S.measure, px = Math.hypot(b[0] - a[0], b[1] - a[1]);
+  ctx.strokeStyle = '#E56458'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke();
+  [a, b].forEach(p => { ctx.beginPath(); ctx.arc(p[0], p[1], 4, 0, 7); ctx.fillStyle = '#E56458'; ctx.fill(); });
+  let t = 'на экране ' + fmt(px / pxmm());
+  if (Math.abs(S.zoom - 1) > 1e-3) t += '  ·  в модели ' + fmt(px / pxmm() / S.zoom);
+  tag(t, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2 - 16, '#E56458');
+}
+function updateHud() {
+  const h = [];
+  if (!calib) h.push('<div class="warn">⚠ Экран не откалиброван — нажмите «Калибровка»</div>');
+  if (Math.abs(S.zoom - 1) < 1e-3) h.push('<div>Масштаб 1:1 ✓</div>');
+  else h.push(`<div class="warn">Зум ×${S.zoom.toFixed(2)} — не 1:1 (R — сброс)</div>`);
+  h.push(S.persp ? '<div class="warn">Перспектива искажает размеры</div>' : '<div>Ортографическая камера</div>');
+  $('#hud').innerHTML = h.join('');
+  $('#tip').textContent = S.mode === 'draw' ? 'Черчение: клик — точка, клик по первой точке или Enter — замкнуть, Backspace — отменить точку, Shift — по горизонтали/вертикали, Esc — выход'
+    : S.mode === 'measure' ? 'Линейка: зажмите и протяните. Esc — выход. С фото на подложке: «Подогнать фото» сделает его 1:1'
+    : 'ЛКМ — вращать · ПКМ/Shift — двигать · колесо — зум · клик по объекту — выбрать · 1–4 — виды · R — 1:1';
+  $('#fabFit').hidden = !(S.measure && S.bg.img);
+}
+
+/* =====================================================================
+   5. ЕДИНИЦЫ ИЗМЕРЕНИЯ
+   ===================================================================== */
+const unit = () => $('#fUnit').value;
+const toMm = v => unit() === 'cm' ? v * 10 : v;
+const fromMm = v => unit() === 'cm' ? v / 10 : v;
+const num = v => (+v.toFixed(unit() === 'cm' ? 2 : 1)).toLocaleString('ru-RU');
+const fmt = mm => num(fromMm(mm)) + (unit() === 'cm' ? ' см' : ' мм');
+const fmt3 = o => `${num(fromMm(o.l))}×${num(fromMm(o.w))}×${num(fromMm(o.h))} ${unit() === 'cm' ? 'см' : 'мм'}`;
+
+/* =====================================================================
+   6. ОБЪЕКТЫ: добавление, изменение, список
+   ===================================================================== */
+function addObj(p) {
+  const o = Object.assign({ id: S.nextId++, rot: 0, color: PALETTE[(S.nextId - 2) % PALETTE.length] }, p);
+  o.rgb = hex2rgb(o.color); o.mesh = buildMesh(o);
+  S.objs.push(o); S.sel = o.id; changed();
+  return o;
+}
+function changed() { layout(); renderList(); persist(); redraw(); }
+function persist() { save(LS_SCENE, { objs: S.objs.map(({ mesh, _pv, rgb, px, pz, ...r }) => r), unit: unit() }); }
+function readForm() {
+  const l = toMm(+$('#fL').value), w = toMm(+$('#fW').value), h = toMm(+$('#fH').value);
+  if (!(l > 0 && w > 0 && h > 0)) { alert('Введите положительные размеры'); return null; }
+  return { type: $('#fShape').value, name: $('#fName').value.trim() || 'Объект', l, w, h, color: $('#fColor').value };
+}
+function fillForm(o) {
+  if (o.type !== 'ext') $('#fShape').value = o.type;
+  $('#fName').value = o.name; $('#fColor').value = o.color;
+  $('#fL').value = +fromMm(o.l).toFixed(2); $('#fW').value = +fromMm(o.w).toFixed(2); $('#fH').value = +fromMm(o.h).toFixed(2);
+}
+function applyToSelected() {
+  const o = S.objs.find(o => o.id === S.sel), f = readForm(); if (!o || !f) return;
+  if (o.type === 'ext') {                       // контур масштабируем под новые Д и Ш
+    const sx = f.l / o.l, sz = f.w / o.w; o.pts = o.pts.map(([x, z]) => [x * sx, z * sz]); delete f.type;
+  }
+  Object.assign(o, f); o.rgb = hex2rgb(o.color); o.mesh = buildMesh(o); changed();
+}
+const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function renderList() {
+  $('#list').innerHTML = S.objs.length ? S.objs.map(o => `
+    <div class="obj ${o.id === S.sel ? 'sel' : ''}" data-id="${o.id}">
+      <span class="sw" style="background:${o.color}"></span>
+      <div class="on"><b>${esc(o.name)}</b><small>${fmt3(o)}</small></div>
+      <button data-act="rot" title="Повернуть на 90°"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;vertical-align:-1px"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/></svg></button>
+      <button data-act="dup" title="Копия"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;vertical-align:-1px"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 4H6a2 2 0 0 0-2 2v10"/></svg></button>
+      <button data-act="del" title="Удалить"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;vertical-align:-1px"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>`).join('') : '<p class="hint">Пока пусто — добавьте объект или пресет.</p>';
+  $('#btnApply').disabled = !S.sel;
+}
+function select(id) {
+  S.sel = id; const o = S.objs.find(o => o.id === id); if (o) fillForm(o);
+  renderList(); redraw();
+}
+function delSelected() { if (!S.sel) return; S.objs = S.objs.filter(o => o.id !== S.sel); S.sel = null; changed(); }
+function rotSelected(a) { const o = S.objs.find(o => o.id === S.sel); if (o) { o.rot += a; changed(); } }
+
+/* =====================================================================
+   7. ЧЕРЧЕНИЕ И ЛИНЕЙКА
+   ===================================================================== */
+function setMode(m) {
+  S.mode = S.mode === m ? 'view' : m;
+  if (S.mode !== 'draw') S.draw = { pts: [], hover: null };
+  if (S.mode !== 'measure') S.measure = null;
+  cv.className = S.mode === 'view' ? '' : S.mode;
+  $('#btnDraw').classList.toggle('on', S.mode === 'draw');
+  $('#btnMeasure').classList.toggle('on', S.mode === 'measure');
+  redraw();
+}
+/* экранная точка → мм в плоскости экрана (с привязкой к сетке) */
+function toSketch(x, y, shift) {
+  const k = pxmm() * S.zoom, [ox, oy] = origin(), st = +$('#fSnap').value;
+  let p = [(x - ox) / k, (y - oy) / k];
+  if (st) p = p.map(v => Math.round(v / st) * st);
+  const last = S.draw.pts[S.draw.pts.length - 1];
+  if (shift && last) { if (Math.abs(p[0] - last[0]) > Math.abs(p[1] - last[1])) p[1] = last[1]; else p[0] = last[0]; }
+  return p;
+}
+function closeEnough() {
+  const D = S.draw; if (D.pts.length < 3 || !D.hover) return false;
+  return Math.hypot(D.hover[0] - D.pts[0][0], D.hover[1] - D.pts[0][1]) * pxmm() * S.zoom < 12;
+}
+function finishSketch() {
+  const pts = S.draw.pts; if (pts.length < 3) return;
+  const xs = pts.map(p => p[0]), zs = pts.map(p => p[1]);
+  const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cz = (Math.min(...zs) + Math.max(...zs)) / 2;
+  const h = toMm(+$('#fExtH').value) || 10;
+  addObj({ type: 'ext', name: 'Чертёж ' + S.nextId, pts: pts.map(([x, z]) => [x - cx, z - cz]),
+           l: Math.max(...xs) - Math.min(...xs), w: Math.max(...zs) - Math.min(...zs), h });
+  setMode('view'); setView('iso');
+}
+/* Подогнать фото: отрезок линейки = известный реальный размер */
+function fitPhoto() {
+  if (!S.measure || !S.bg.img) return;
+  const { a, b } = S.measure, modelMm = Math.hypot(b[0] - a[0], b[1] - a[1]) / (pxmm() * S.zoom);
+  const v = prompt(`Какой реальный размер у этого отрезка на фото? (${unit() === 'cm' ? 'см' : 'мм'})`);
+  const real = toMm(parseFloat(String(v).replace(',', '.')));
+  if (!(real > 0) || !(modelMm > 0)) return;
+  const f = real / modelMm, [ox, oy] = origin(), k = pxmm() * S.zoom;
+  // масштабируем вокруг середины отрезка, чтобы фото не «уехало»
+  const mx = ((a[0] + b[0]) / 2 - ox) / k, my = ((a[1] + b[1]) / 2 - oy) / k;
+  S.bg.x = mx + (S.bg.x - mx) * f; S.bg.y = my + (S.bg.y - my) * f; S.bg.mpp *= f;
+  S.measure = null; redraw();
+}
+
+/* =====================================================================
+   8. МЫШЬ, КОЛЕСО, КЛАВИАТУРА
+   ===================================================================== */
+let drag = null;
+cv.addEventListener('pointerdown', e => {
+  cv.setPointerCapture(e.pointerId);
+  const x = e.offsetX, y = e.offsetY;
+  if (S.mode === 'draw' && e.button === 0) {
+    if (closeEnough()) return finishSketch();
+    S.draw.pts.push(toSketch(x, y, e.shiftKey)); redraw(); return;
+  }
+  if (S.mode === 'measure' && e.button === 0) { S.measure = { a: [x, y], b: [x, y] }; drag = { kind: 'measure' }; return; }
+  const kind = e.altKey && S.bg.img ? 'bg' : (e.button === 2 || e.button === 1 || e.shiftKey) ? 'pan' : 'rot';
+  drag = { kind, x, y, sx: x, sy: y };
+  if (kind !== 'rot' || S.mode === 'view') cv.style.cursor = 'grabbing';
+});
+cv.addEventListener('pointermove', e => {
+  const x = e.offsetX, y = e.offsetY;
+  if (S.mode === 'draw') { S.draw.hover = toSketch(x, y, e.shiftKey); redraw(); }
+  if (!drag) return;
+  if (drag.kind === 'measure') { S.measure.b = [x, y]; redraw(); return; }
+  const dx = x - drag.x, dy = y - drag.y; drag.x = x; drag.y = y;
+  if (drag.kind === 'rot') { S.yaw += dx * 0.01; S.pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, S.pitch + dy * 0.01)); }
+  else if (drag.kind === 'pan') { S.panX += dx; S.panY += dy; }
+  else if (drag.kind === 'bg') { const k = pxmm() * S.zoom; S.bg.x += dx / k; S.bg.y += dy / k; }
+  redraw();
+});
+cv.addEventListener('pointerup', e => {
+  if (drag && drag.kind === 'rot' && Math.hypot(e.offsetX - drag.sx, e.offsetY - drag.sy) < 4) select(hitTest(e.offsetX, e.offsetY));
+  if (drag && drag.kind === 'measure') updateHud();
+  drag = null; cv.style.cursor = '';
+});
+cv.addEventListener('contextmenu', e => e.preventDefault());
+cv.addEventListener('wheel', e => {
+  e.preventDefault();
+  if (e.altKey && S.bg.img) { S.bg.mpp *= Math.exp(-e.deltaY * 0.001); return redraw(); }
+  const old = S.zoom; let z = old * Math.exp(-e.deltaY * 0.0012);
+  z = Math.max(0.05, Math.min(20, z)); if (Math.abs(z - 1) < 0.04 && Math.abs(old - 1) >= 1e-3) z = 1; // «прилипание» к 1:1
+  // зум к курсору
+  const [ox, oy] = origin(); S.panX += (e.offsetX - ox) * (1 - z / old); S.panY += (e.offsetY - oy) * (1 - z / old);
+  S.zoom = z; redraw();
+}, { passive: false });
+/* Выбор объекта кликом: ищем объект, чья проекция содержит точку (ближайший к зрителю) */
+function hitTest(x, y) {
+  let best = null, bd = -Infinity;
+  for (const o of S.objs) {
+    if (!o._pv) continue;
+    for (const f of o.mesh.f) {
+      const poly = f.i.map(i => o._pv[i]); let inside = false;
+      for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+        const [xi, yi] = poly[i], [xj, yj] = poly[j];
+        if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
+      }
+      if (inside) { const d = poly.reduce((s, p) => s + p[2], 0) / poly.length; if (d > bd) { bd = d; best = o.id; } }
+    }
+  }
+  return best;
+}
+function onKey(e) {
+  const t = e.target; if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) return;
+  if (!$('#calib').hidden || !$('#help').hidden) { if (e.key === 'Escape') { $('#calib').hidden = true; $('#help').hidden = true; } return; }
+  const k = e.key.toLowerCase();
+  const map = {
+    '1': () => setView('front'), '2': () => setView('top'), '3': () => setView('side'), '4': () => setView('iso'),
+    'r': resetView, 'к': resetView, 'o': togglePersp, 'щ': togglePersp,
+    'd': () => setMode('draw'), 'в': () => setMode('draw'), 'm': () => setMode('measure'), 'ь': () => setMode('measure'),
+    'q': () => rotSelected(-Math.PI / 12), 'й': () => rotSelected(-Math.PI / 12), 'e': () => rotSelected(Math.PI / 12), 'у': () => rotSelected(Math.PI / 12),
+    'l': toggleLayout, 'д': toggleLayout, 'h': toggleCompact, 'р': toggleCompact, 'c': openCalib, 'с': openCalib,
+    'delete': delSelected,
+    'escape': () => { if (S.mode !== 'view') setMode(S.mode); else select(null); },
+    'enter': () => S.mode === 'draw' && finishSketch(),
+    'backspace': () => { if (S.mode === 'draw') { S.draw.pts.pop(); redraw(); } else delSelected(); },
+  };
+  if (map[k] && !e.ctrlKey && !e.metaKey) { e.preventDefault(); map[k](); }
+}
+document.addEventListener('keydown', onKey);
+
+/* =====================================================================
+   9. ПАНЕЛЬ: кнопки и поля
+   ===================================================================== */
+function togglePersp() { S.persp = !S.persp; $('#camOrtho').classList.toggle('on', !S.persp); $('#camPersp').classList.toggle('on', S.persp); redraw(); }
+function toggleLayout() { S.layout = S.layout === 'row' ? 'over' : 'row'; $('#layRow').classList.toggle('on', S.layout === 'row'); $('#layOver').classList.toggle('on', S.layout !== 'row'); changed(); }
+function toggleCompact() { document.body.classList.toggle('compact'); redraw(); }
+
+$('#btnAdd').onclick = () => { const f = readForm(); if (f) { addObj(f); fillForm(S.objs[S.objs.length - 1]); $('#fColor').value = PALETTE[(S.nextId - 1) % PALETTE.length]; } };
+$('#btnApply').onclick = applyToSelected;
+$('#fShape').onchange = () => {
+  const t = $('#fShape').value;
+  $('#fHint').textContent = t === 'cyl' || t === 'cone' ? 'Для цилиндра/конуса: Длина и Ширина = диаметр (разные — получится овал).'
+    : t === 'sph' ? 'Для шара все три размера = диаметр.' : 'Порядок как в магазинах: Д × Ш × В. Длина — влево-вправо, ширина — вглубь, высота — вверх.';
+};
+$('#fUnit').onchange = () => {   // пересчитываем введённые числа в новые единицы
+  const f = $('#fUnit').value === 'cm' ? 0.1 : 10;
+  ['#fL', '#fW', '#fH', '#fExtH'].forEach(s => $(s).value = +(+$(s).value * f).toFixed(2));
+  renderList(); persist(); redraw();
+};
+$('#fPreset').innerHTML = PRESETS.map((p, i) => `<option value="${i}">${p[0]} — ${p[2]}×${p[3]}×${p[4]} мм</option>`).join('');
+$('#btnPreset').onclick = () => { const p = PRESETS[$('#fPreset').value]; addObj({ name: p[0], type: p[1], l: p[2], w: p[3], h: p[4], color: '#B9B6B0' }); };
+$('#list').onclick = e => {
+  const row = e.target.closest('.obj'); if (!row) return; const id = +row.dataset.id, act = e.target.dataset.act;
+  if (act === 'del') { S.sel = id; return delSelected(); }
+  if (act === 'rot') { S.sel = id; return rotSelected(Math.PI / 2); }
+  if (act === 'dup') { const o = S.objs.find(o => o.id === id); const { mesh, _pv, id: _, ...c } = o; return addObj({ ...c, name: o.name + ' (копия)' }); }
+  select(id);
+};
+$('#btnClear').onclick = () => { if (S.objs.length && confirm('Удалить все объекты?')) { S.objs = []; S.sel = null; changed(); } };
+$('#camOrtho').onclick = () => S.persp && togglePersp();
+$('#camPersp').onclick = () => !S.persp && togglePersp();
+document.querySelectorAll('[data-view]').forEach(b => b.onclick = () => setView(b.dataset.view));
+$('#layRow').onclick = () => S.layout !== 'row' && toggleLayout();
+$('#layOver').onclick = () => S.layout === 'row' && toggleLayout();
+$('#fAlpha').oninput = e => { S.alpha = +e.target.value; redraw(); };
+$('#fGrid').onchange = e => { S.grid = e.target.checked; redraw(); };
+$('#fLabels').onchange = e => { S.labels = e.target.checked; redraw(); };
+$('#fDims').onchange = e => { S.dims = e.target.checked; redraw(); };
+$('#btnDraw').onclick = () => setMode('draw');
+$('#btnMeasure').onclick = () => setMode('measure');
+$('#btnCompact').onclick = toggleCompact; $('#fabPanel').onclick = toggleCompact;
+$('#fabReset').onclick = resetView; $('#fabFit').onclick = fitPhoto;
+$('#btnFull').onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+$('#btnPng').onclick = () => { const a = document.createElement('a'); a.download = 'razmer-1-1.png'; a.href = cv.toDataURL('image/png'); a.click(); };
+$('#btnHelp').onclick = () => $('#help').hidden = false; $('#helpClose').onclick = () => $('#help').hidden = true;
+
+/* Фото-подложка: файл, вставка из буфера, перетаскивание */
+function setImage(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  const img = new Image();
+  img.onload = () => { const k = pxmm() * S.zoom; Object.assign(S.bg, { img, x: 0, y: 0, mpp: (S.H * 0.8 / k) / img.height }); redraw(); };
+  img.src = URL.createObjectURL(file);
+}
+$('#btnImg').onclick = () => $('#fImg').click();
+$('#fImg').onchange = e => setImage(e.target.files[0]);
+$('#btnImgDel').onclick = () => { S.bg.img = null; redraw(); };
+$('#fImgOp').oninput = e => { S.bg.op = +e.target.value; redraw(); };
+document.addEventListener('paste', e => { const it = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith('image/')); if (it) setImage(it.getAsFile()); });
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop', e => { e.preventDefault(); setImage(e.dataTransfer.files[0]); });
+
+/* =====================================================================
+   10. КАЛИБРОВКА
+   ===================================================================== */
+let calV = pxmm();
+function openCalib() {
+  calV = pxmm(); $('#calSlider').value = calV; drawCalib(); $('#calib').hidden = false;
+}
+function drawCalib() {
+  const ref = $('#calRef').value, card = $('#calCard'), rul = $('#calRuler');
+  card.hidden = ref !== 'card'; rul.hidden = ref !== 'ruler';
+  card.style.width = 85.6 * calV + 'px'; card.style.height = 53.98 * calV + 'px'; card.style.borderRadius = 3.18 * calV + 'px';
+  rul.style.width = 100 * calV + 'px';
+  rul.style.backgroundImage = 'linear-gradient(to right,#333 1px,transparent 1px),linear-gradient(to right,#999 1px,transparent 1px)';
+  rul.style.backgroundSize = `${10 * calV}px 18px, ${calV}px 8px`;
+  $('#calText').textContent = ref === 'card'
+    ? 'Приложите банковскую карту к рамке (левый верхний угол к углу) и двигайте ползунок, пока рамка не совпадёт с краями карты.'
+    : 'Приложите линейку: расстояние между крайними чертами должно быть ровно 10 см. Длинные риски — каждый сантиметр.';
+  const diag = Math.hypot(screen.width, screen.height) / calV / 25.4;
+  $('#calInfo').textContent = `${calV.toFixed(3)} px/мм · экран ≈ ${diag.toFixed(1)}″ по диагонали`;
+}
+$('#calSlider').oninput = e => { calV = +e.target.value; drawCalib(); };
+document.querySelectorAll('[data-cal]').forEach(b => b.onclick = () => { calV *= 1 + 0.001 * b.dataset.cal; $('#calSlider').value = calV; drawCalib(); });
+$('#calRef').onchange = drawCalib;
+$('#calDiagBtn').onclick = () => {   // из диагонали: CSS-пикселей по диагонали / (дюймы × 25.4)
+  const d = parseFloat($('#calDiag').value); if (!(d > 0)) return;
+  calV = Math.hypot(screen.width, screen.height) / (d * 25.4); $('#calSlider').value = calV; drawCalib();
+};
+$('#calCancel').onclick = () => $('#calib').hidden = true;
+$('#calSave').onclick = () => { calib = { v: calV, dpr: window.devicePixelRatio || 1 }; save(LS_CAL, calib); $('#calib').hidden = true; updateCalStatus(); redraw(); };
+$('#btnCalib').onclick = openCalib;
+function updateCalStatus() {
+  const el = $('#calStatus');
+  el.className = 'status ' + (calib ? 'good' : 'bad');
+  el.textContent = calib ? `✓ Откалибровано: ${pxmm().toFixed(3)} px/мм` : '⚠ Не откалибровано — размеры могут быть неточными. Нажмите «Калибровка».';
+}
+
+/* =====================================================================
+   11. РЕЖИМ «ПОВЕРХ ВСЕХ ОКОН» (Document Picture-in-Picture, Chrome/Edge 116+)
+   Холст переносится в маленькое окно, которое всегда остаётся над браузером.
+   ===================================================================== */
+$('#btnPip').onclick = async () => {
+  if (!('documentPictureInPicture' in window)) { alert('Режим «Поверх всех окон» работает в Chrome или Edge (версия 116+).\nАльтернатива: вставьте скриншот товара Ctrl+V как подложку.'); return; }
+  if (documentPictureInPicture.window) { documentPictureInPicture.window.close(); return; }
+  const wrap = $('#wrap'), home = wrap.parentNode;
+  const pip = await documentPictureInPicture.requestWindow({ width: 560, height: 420 });
+  document.querySelectorAll('style').forEach(s => pip.document.head.appendChild(s.cloneNode(true)));
+  pip.document.title = 'Размер 1:1'; pip.document.body.classList.add('pip');
+  pip.document.body.appendChild(wrap);
+  ctx = cv.getContext('2d');
+  pip.document.addEventListener('keydown', onKey);
+  pip.addEventListener('resize', redraw);
+  pip.addEventListener('pagehide', () => { home.appendChild(wrap); redraw(); });
+  $('#btnPip').classList.add('on'); redraw();
+  pip.addEventListener('pagehide', () => $('#btnPip').classList.remove('on'));
+};
+
+/* =====================================================================
+   12. СТАРТ
+   ===================================================================== */
+window.addEventListener('resize', redraw);
+window.matchMedia && setInterval(() => { /* следим за сменой зума браузера/монитора */
+  const d = win().devicePixelRatio; if (d !== S._dpr) { S._dpr = d; updateCalStatus(); redraw(); } }, 700);
+(function init() {
+  const sc = load(LS_SCENE);
+  if (sc && sc.unit) $('#fUnit').value = sc.unit;
+  if (sc && sc.objs && sc.objs.length) {
+    sc.objs.forEach(o => { o.rgb = hex2rgb(o.color); o.mesh = buildMesh(o); S.nextId = Math.max(S.nextId, o.id + 1); });
+    S.objs = sc.objs;
+  } else {
+    addObj({ type: 'box', name: 'Мой объект', l: 150, w: 100, h: 80, color: PALETTE[0] });
+    addObj({ name: PRESETS[0][0], type: 'box', l: 71.6, w: 7.8, h: 147.6, color: '#B9B6B0' });
+    S.sel = null;
+  }
+  ['#fL', '#fW', '#fH'].forEach((s, i) => $(s).value = fromMm([150, 100, 80][i]));
+  $('#fExtH').value = fromMm(50);
+  layout(); renderList(); updateCalStatus(); redraw();
+  if (!calib) setTimeout(openCalib, 400);   // первый запуск — сразу калибровка
+})();
+</script>
+</body>
+</html>
