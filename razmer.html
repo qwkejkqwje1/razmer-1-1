@@ -44,7 +44,8 @@ button.on{background:var(--accs);border-color:var(--acc);color:var(--acc)}
 .status.bad{background:var(--warns);color:#8a4b14}.status.good{background:#E8F1EC;color:#2c6b49}
 .obj{display:flex;align-items:center;gap:6px;padding:5px 6px;border-radius:6px;cursor:pointer;border:1px solid transparent}
 .obj:hover{background:var(--bg)}.obj.sel{border-color:var(--acc);background:var(--accs)}
-.obj .sw{width:12px;height:12px;border-radius:3px;flex:none}
+.obj .sw{width:20px;height:20px;flex:none;padding:0;border:1px solid var(--line);border-radius:4px;background:none;cursor:pointer}
+.obj .sw::-webkit-color-swatch-wrapper{padding:0}.obj .sw::-webkit-color-swatch{border:none;border-radius:3px}
 .obj .on{flex:1;min-width:0}.obj .on b{display:block;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .obj small{color:var(--mut)}
 .obj button{padding:2px 6px;font-size:12px}
@@ -105,7 +106,8 @@ kbd{font:11px ui-monospace,monospace;background:var(--sec);border:1px solid var(
 
   <details open><summary>Объекты на сцене</summary>
     <div id="list"></div>
-    <div class="row"><button id="btnClear">Очистить всё</button></div>
+    <p class="hint">Тяните объект мышью, чтобы передвинуть (<kbd>Ctrl</kbd> — поднять). Стрелки — точно, <kbd>PgUp</kbd>/<kbd>PgDn</kbd> — высота. Квадратик слева — цвет.</p>
+    <div class="row"><button id="btnResetPos">Вернуть на места</button><button id="btnClear">Очистить всё</button></div>
   </details>
 
   <details open><summary>Вид</summary>
@@ -114,6 +116,9 @@ kbd{font:11px ui-monospace,monospace;background:var(--sec);border:1px solid var(
     </div>
     <div class="row">
       <button data-view="front">Спереди</button><button data-view="top">Сверху</button><button data-view="side">Сбоку</button><button data-view="iso">3D</button>
+    </div>
+    <div class="row">
+      <button id="btnFly">✈ Полёт</button><button id="btnOrbit">🔄 Облёт</button><button id="btnFit">Показать всё</button>
     </div>
     <div class="row">
       <button id="layRow" class="on">В ряд</button><button id="layOver">Наложить друг на друга</button>
@@ -185,12 +190,17 @@ kbd{font:11px ui-monospace,monospace;background:var(--sec);border:1px solid var(
     <li><b>Размер экрана (один раз).</b> Запустите <b>detect-screen</b> из папки программы — размер считается прямо из монитора. Для проверки приложите карту в окне «Калибровка».</li>
     <li><b>Объект.</b> Введите размеры товара (Д × Ш × В) → «Добавить». При виде «Спереди», ортографической камере и масштабе 1:1 передняя грань на экране точно равна реальной.</li>
     <li><b>Сравнение.</b> Поставьте рядом знакомый предмет: телефон, лист А4, банку колы.</li>
-    <li><b>Осмотр.</b> Левая кнопка мыши — вращать, правая (или <kbd>Shift</kbd>) — двигать, колесо — зум (<kbd>R</kbd> вернёт 1:1).</li>
+    <li><b>Осмотр.</b> Тяните объект — передвинуть. По пустому месту: левая кнопка — вращать, правая (или <kbd>Shift</kbd>) — двигать, колесо — зум (<kbd>R</kbd> вернёт 1:1). <kbd>F</kbd> — режим полёта.</li>
     <li><b>Поверх браузера.</b> «📌 Поверх всех окон» открывает мини-окно, которое висит над магазином. Или вставьте скриншот товара <kbd>Ctrl</kbd>+<kbd>V</kbd>.</li>
   </ol>
   <table class="keys">
     <tr><td><kbd>1</kbd>–<kbd>4</kbd></td><td>Спереди / Сверху / Сбоку / 3D</td></tr>
     <tr><td><kbd>R</kbd></td><td>Сбросить вид в 1:1</td></tr>
+    <tr><td><kbd>F</kbd></td><td>Полёт: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>, <kbd>E</kbd>/<kbd>Q</kbd> — вверх/вниз, мышь — осмотр, колесо — скорость</td></tr>
+    <tr><td><kbd>T</kbd></td><td>Автооблёт вокруг сцены</td></tr>
+    <tr><td><kbd>0</kbd> / двойной клик</td><td>Показать всё / подлететь к объекту</td></tr>
+    <tr><td>Мышь по объекту</td><td>Передвинуть (<kbd>Ctrl</kbd> — по высоте), стрелки — точно</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td>Отменить</td></tr>
     <tr><td><kbd>O</kbd></td><td>Орто / перспектива</td></tr>
     <tr><td><kbd>D</kbd> / <kbd>M</kbd></td><td>Черчение / линейка, <kbd>Esc</kbd> — выход</td></tr>
     <tr><td><kbd>Q</kbd> / <kbd>E</kbd></td><td>Повернуть выбранный на 15°</td></tr>
@@ -227,6 +237,8 @@ const S = {
   measure: null,                      // {a:[x,y], b:[x,y]} в экранных px
   bg: { img: null, op: 0.6, mpp: 1, x: 0, y: 0 }, // mpp — мм на пиксель картинки
   tx: 0, ty: 0, tz: 0,                // центр сцены (куда смотрит камера)
+  dist: 500,                          // расстояние камеры до центра в перспективе, мм
+  fly: false, flySpeed: 300, orbit: false, // полёт камеры (мм/с) и автооблёт
   W: 0, H: 0
 };
 
@@ -347,9 +359,15 @@ function buildMesh(o) {
   }
 }
 /* Мировые координаты вершин объекта (поворот вокруг вертикали + сдвиг) */
-function worldVerts(o) {
+/* Вершины только с поворотом (без сдвига) */
+function rotVerts(o) {
   const c = Math.cos(o.rot), s = Math.sin(o.rot);
-  return o.mesh.v.map(([x, y, z]) => [c * x + s * z + o.px, y, -s * x + c * z + o.pz]);
+  return o.mesh.v.map(([x, y, z]) => [c * x + s * z, y, -s * x + c * z]);
+}
+/* Мировые координаты: поворот + место в раскладке (px, pz) + ручной сдвиг пользователем (ox, oy, oz) */
+function worldVerts(o) {
+  const dx = o.px + (o.ox || 0), dy = o.oy || 0, dz = o.pz + (o.oz || 0);
+  return rotVerts(o).map(([x, y, z]) => [x + dx, y + dy, z + dz]);
 }
 function bbox(pts) {
   const b = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity];
@@ -358,19 +376,22 @@ function bbox(pts) {
 }
 
 /* Расстановка объектов: в ряд слева направо или все в одной точке (наложение) */
-function layout() {
-  let cur = 0, all = [];
+/* retarget=true — заодно навести камеру на центр сцены (при добавлении/удалении объектов) */
+function layout(retarget) {
+  let cur = 0;
   for (const o of S.objs) {
     o.mesh = o.mesh || buildMesh(o);
-    o.px = 0; o.pz = 0;
-    const b = bbox(worldVerts(o));
+    const b = bbox(rotVerts(o));
     if (S.layout === 'row') { o.px = cur - b[0]; cur += b[3] - b[0] + 30; }
     else o.px = -(b[0] + b[3]) / 2;
     o.pz = -(b[2] + b[5]) / 2;
-    all.push(...worldVerts(o));
   }
-  if (all.length) { const b = bbox(all); S.tx = (b[0] + b[3]) / 2; S.ty = b[4] / 2; S.tz = (b[2] + b[5]) / 2; }
-  else { S.tx = S.ty = S.tz = 0; }
+  if (retarget) Object.assign(S, sceneCenter());
+}
+function sceneCenter() {
+  const all = S.objs.flatMap(worldVerts);
+  if (!all.length) return { tx: 0, ty: 0, tz: 0 };
+  const b = bbox(all); return { tx: (b[0] + b[3]) / 2, ty: (b[1] + b[4]) / 2, tz: (b[2] + b[5]) / 2 };
 }
 
 /* =====================================================================
@@ -380,20 +401,94 @@ function layout() {
 function makeProj() {
   const cy = Math.cos(S.yaw), sy = Math.sin(S.yaw), cp = Math.cos(S.pitch), sp = Math.sin(S.pitch);
   const k = pxmm() * S.zoom, ox = S.W / 2 + S.panX, oy = S.H / 2 + S.panY;
-  return p => {
+  const view = p => {                                          // мир → координаты камеры
     const x = p[0] - S.tx, y = p[1] - S.ty, z = p[2] - S.tz;
     const x1 = cy * x + sy * z, z1 = -sy * x + cy * z;
-    const y2 = cp * y - sp * z1, z2 = sp * y + cp * z1;
-    const f = S.persp ? EYE / Math.max(EYE - z2, EYE * 0.1) : 1;
-    return [ox + x1 * k * f, oy - y2 * k * f, z2, x1, y2];   // экран x, экран y, глубина, вид x, вид y
+    return [x1, cp * y - sp * z1, sp * y + cp * z1];
   };
+  const scr = v => {                                           // камера → экран
+    const f = S.persp ? S.dist / Math.max(S.dist - v[2], 1) : 1;
+    return [ox + v[0] * k * f, oy - v[1] * k * f, v[2], v[0], v[1]]; // экран x, экран y, глубина, вид x, вид y
+  };
+  const P = p => scr(view(p)); P.view = view; P.scr = scr;
+  return P;
+}
+/* Оси камеры в мировых координатах: вправо, вверх, «назад» (от сцены к камере) */
+function camAxes() {
+  const cy = Math.cos(S.yaw), sy = Math.sin(S.yaw), cp = Math.cos(S.pitch), sp = Math.sin(S.pitch);
+  return { r: [cy, 0, sy], u: [sp * sy, cp, -sp * cy], b: [-sy * cp, sp, cy * cp] };
+}
+/* ---------- Плавные перелёты камеры ---------- */
+let anim = null;
+function flyTo(to, ms = 600) {
+  const from = {}; for (const k in to) from[k] = S[k];
+  if ('yaw' in to) { const d = ((to.yaw - from.yaw) % (2 * Math.PI) + 3 * Math.PI) % (2 * Math.PI) - Math.PI; to.yaw = from.yaw + d; }
+  const id = {}; anim = id; let t0 = null;
+  const step = t => {
+    if (anim !== id) return; if (t0 === null) t0 = t;
+    let u = Math.min(1, (t - t0) / ms); u = u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2; // ease-in-out
+    for (const k in to) S[k] = k === 'zoom' ? from[k] * Math.pow(to[k] / from[k], u) : from[k] + (to[k] - from[k]) * u;
+    render(); if (u < 1) win().requestAnimationFrame(step); else anim = null;
+  };
+  win().requestAnimationFrame(step);
+}
+/* Показать всё: вписать сцену в окно (масштаб уже не 1:1!) */
+function fitAll() {
+  if (!S.objs.length) return;
+  const c = sceneCenter(), keep = { tx: S.tx, ty: S.ty, tz: S.tz, panX: S.panX, panY: S.panY, zoom: S.zoom };
+  Object.assign(S, c, { panX: 0, panY: 0, zoom: 1 });
+  const pts = S.objs.flatMap(worldVerts).map(makeProj()); Object.assign(S, keep);
+  const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
+  const z = Math.min((S.W - 60) * 0.85 / (Math.max(...xs) - Math.min(...xs) || 1), (S.H - 60) * 0.85 / (Math.max(...ys) - Math.min(...ys) || 1));
+  flyTo({ ...c, panX: 0, panY: 0, zoom: Math.max(0.05, Math.min(20, z)) });
+}
+/* Двойной клик по объекту — подлететь к нему в масштабе 1:1 */
+function focusObj(id) {
+  const o = S.objs.find(o => o.id === id); if (!o) return;
+  const b = bbox(worldVerts(o)); select(id);
+  flyTo({ tx: (b[0] + b[3]) / 2, ty: (b[1] + b[4]) / 2, tz: (b[2] + b[5]) / 2, panX: 0, panY: 0, zoom: S.fly ? S.zoom : 1 });
 }
 const origin = () => [S.W / 2 + S.panX, S.H / 2 + S.panY];
 function setView(v) {
   const V = { front: [0, 0], top: [0, Math.PI / 2], side: [-Math.PI / 2, 0], iso: [-0.6, 0.45] }[v];
-  S.yaw = V[0]; S.pitch = V[1]; redraw();
+  if (S.fly) toggleFly();
+  flyTo({ yaw: V[0], pitch: V[1] });
 }
-function resetView() { S.zoom = 1; S.panX = S.panY = 0; setView('front'); }
+function resetView() { if (S.fly) toggleFly(); if (S.orbit) toggleOrbit(); flyTo({ ...sceneCenter(), zoom: 1, panX: 0, panY: 0, yaw: 0, pitch: 0 }); }
+
+/* ---------- Полёт камеры (WASD) и автооблёт ---------- */
+const held = new Set();
+let lastTick = null, ticking = false;
+function startTick() { if (!ticking) { ticking = true; lastTick = null; win().requestAnimationFrame(tick); } }
+function tick(t) {
+  if (!S.fly && !S.orbit) { ticking = false; return; }
+  const dt = lastTick === null ? 0 : Math.min(0.05, (t - lastTick) / 1000); lastTick = t;
+  let moved = false;
+  if (S.orbit) { S.yaw += 0.5 * dt; moved = true; }
+  if (S.fly) {
+    const v = (held.has('ShiftLeft') || held.has('ShiftRight') ? 4 : 1) * S.flySpeed * dt, a = camAxes();
+    const f = held.has('KeyW') - held.has('KeyS'), r = held.has('KeyD') - held.has('KeyA'),
+          u = (held.has('KeyE') || held.has('Space')) - held.has('KeyQ');
+    if (f || r || u) {
+      const d = [0, 1, 2].map(i => -a.b[i] * f * v + a.r[i] * r * v + (i === 1 ? u * v : 0));
+      S.tx += d[0]; S.ty += d[1]; S.tz += d[2]; moved = true;
+    }
+  }
+  if (moved) render();
+  win().requestAnimationFrame(tick);
+}
+function toggleFly() {
+  S.fly = !S.fly; held.clear();
+  if (S.fly) {
+    if (S.mode !== 'view') setMode(S.mode);
+    S._persp0 = S.persp; S.persp = true; S.panX = S.panY = 0; S.zoom = 1; S.dist = 500;
+    startTick();
+  } else { S.persp = S._persp0 || false; }
+  $('#btnFly').classList.toggle('on', S.fly);
+  $('#camOrtho').classList.toggle('on', !S.persp); $('#camPersp').classList.toggle('on', S.persp);
+  redraw();
+}
+function toggleOrbit() { S.orbit = !S.orbit; $('#btnOrbit').classList.toggle('on', S.orbit); if (S.orbit) startTick(); }
 
 /* =====================================================================
    4. ОТРИСОВКА
@@ -416,15 +511,17 @@ function render() {
   const { W, H } = S;
   ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
   drawBg();
-  if (S.grid) drawGrid();
+  if (S.grid && !S.persp) drawGrid();
 
   // --- 3D: собираем все грани, сортируем от дальних к ближним (алгоритм художника) ---
-  const P = makeProj(), items = [];
+  const P = makeProj(), items = [], nearZ = S.dist - 5;
+  if (S.grid && S.persp) drawFloor(P);
   const L = [-0.35, 0.75, 0.55], ll = Math.hypot(...L);
   for (const o of S.objs) {
     const pv = worldVerts(o).map(P); o._pv = pv;
     for (const f of o.mesh.f) {
       const idx = f.i, n = idx.length; let d = 0, nx = 0, ny = 0, nz = 0;
+      if (S.persp && idx.some(i => pv[i][2] > nearZ)) continue;   // грань за камерой — не рисуем
       for (let a = 0; a < n; a++) {                    // нормаль методом Ньюэлла
         const p = pv[idx[a]], q = pv[idx[(a + 1) % n]];
         d += p[2];
@@ -466,7 +563,7 @@ function render() {
   if (S.labels) for (const o of S.objs) drawLabel(o);
   if (S.mode === 'draw') drawSketch();
   if (S.measure) drawMeasure();
-  if (S.grid) drawRulers();
+  if (S.grid && !S.persp) drawRulers();
   updateHud();
 }
 
@@ -481,6 +578,23 @@ function drawGrid() {
     ctx.stroke();
   };
   lines(1, '#F3F2F0', 1); lines(10, '#E6E5E3', 1); lines(50, '#D3D1CD', 1); lines(100, '#B9B6B0', 1);
+}
+/* Пол-сетка в перспективе и полёте: линии каждые 10 см, с отсечением за камерой */
+function drawFloor(P) {
+  const c = sceneCenter(), R = 1500, st = 100, near = S.dist - 10;
+  const cx = Math.round(c.tx / st) * st, cz = Math.round(c.tz / st) * st;
+  ctx.lineWidth = 1;
+  for (let i = -R; i <= R; i += st) for (const dir of [0, 1]) {
+    let a = P.view(dir ? [cx + i, 0, cz - R] : [cx - R, 0, cz + i]), b = P.view(dir ? [cx + i, 0, cz + R] : [cx + R, 0, cz + i]);
+    if (a[2] > near && b[2] > near) continue;
+    if (a[2] > near || b[2] > near) {                     // обрезаем отрезок по плоскости камеры
+      const t = (near - a[2]) / (b[2] - a[2]), m = a.map((v, j) => v + (b[j] - v) * t);
+      if (a[2] > near) a = m; else b = m;
+    }
+    const A = P.scr(a), B = P.scr(b);
+    ctx.strokeStyle = (i % 500 === 0) ? '#C9C6C0' : '#E6E5E3';
+    ctx.beginPath(); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]); ctx.stroke();
+  }
 }
 /* Линейки сверху и слева (в сантиметрах, ноль — в центре сцены) */
 function drawRulers() {
@@ -563,13 +677,16 @@ function drawMeasure() {
 function updateHud() {
   const h = [];
   if (screenInfo().src === 'none') h.push('<div class="warn">⚠ Размер экрана не определён — нажмите «Калибровка»</div>');
-  if (Math.abs(S.zoom - 1) < 1e-3) h.push('<div>Масштаб 1:1 ✓</div>');
+  if (S.fly) h.push(`<div>✈ Полёт · скорость ${Math.round(S.flySpeed / 10)} см/с</div>`);
+  else if (Math.abs(S.zoom - 1) < 1e-3) h.push('<div>Масштаб 1:1 ✓</div>');
   else h.push(`<div class="warn">Зум ×${S.zoom.toFixed(2)} — не 1:1 (R — сброс)</div>`);
   h.push(S.persp ? '<div class="warn">Перспектива искажает размеры</div>' : '<div>Ортографическая камера</div>');
   $('#hud').innerHTML = h.join('');
-  $('#tip').textContent = S.mode === 'draw' ? 'Черчение: клик — точка, клик по первой точке или Enter — замкнуть, Backspace — отменить точку, Shift — по горизонтали/вертикали, Esc — выход'
+  $('#tip').textContent = S.fly ? 'Полёт: W/A/S/D — лететь · E/Пробел — вверх · Q — вниз · Shift — быстрее · мышь — осмотреться · колесо — скорость · F или Esc — выход'
+    : drag && drag.kind === 'obj' ? `Перемещение: ${S.objs.find(o => o.id === drag.id)?.name || ''} · Ctrl — поднять/опустить · шаг привязки — в «Инструментах»`
+    : S.mode === 'draw' ? 'Черчение: клик — точка, клик по первой точке или Enter — замкнуть, Backspace — отменить точку, Shift — по горизонтали/вертикали, Esc — выход'
     : S.mode === 'measure' ? 'Линейка: зажмите и протяните. Esc — выход. С фото на подложке: «Подогнать фото» сделает его 1:1'
-    : 'ЛКМ — вращать · ПКМ/Shift — двигать · колесо — зум · клик по объекту — выбрать · 1–4 — виды · R — 1:1';
+    : 'Тяните объект — переместить · ЛКМ по пустому месту — вращать · ПКМ/Shift — двигать вид · колесо — зум · двойной клик — подлететь · F — полёт · R — 1:1';
   $('#fabFit').hidden = !(S.measure && S.bg.img);
 }
 
@@ -589,11 +706,29 @@ const fmt3 = o => `${num(fromMm(o.l))}×${num(fromMm(o.w))}×${num(fromMm(o.h))}
 function addObj(p) {
   const o = Object.assign({ id: S.nextId++, rot: 0, color: PALETTE[(S.nextId - 2) % PALETTE.length] }, p);
   o.rgb = hex2rgb(o.color); o.mesh = buildMesh(o);
-  S.objs.push(o); S.sel = o.id; changed();
+  S.objs.push(o); S.sel = o.id; changed(true);
   return o;
 }
-function changed() { layout(); renderList(); persist(); redraw(); }
-function persist() { save(LS_SCENE, { objs: S.objs.map(({ mesh, _pv, rgb, px, pz, ...r }) => r), unit: unit() }); }
+function changed(retarget) { layout(retarget); renderList(); persist(); redraw(); }
+/* Сохранение сцены + история для отмены (Ctrl+Z) */
+const hist = [];
+const strip = ({ mesh, _pv, rgb, px, pz, ...r }) => r;
+function persist() {
+  const snap = JSON.stringify(S.objs.map(strip));
+  if (hist[hist.length - 1] !== snap) { hist.push(snap); if (hist.length > 80) hist.shift(); }
+  save(LS_SCENE, { objs: JSON.parse(snap), unit: unit() });
+}
+function undo() {
+  if (hist.length < 2) return;
+  hist.pop(); const snap = hist[hist.length - 1], objs = JSON.parse(snap);
+  objs.forEach(o => { o.rgb = hex2rgb(o.color); o.mesh = buildMesh(o); });
+  S.objs = objs; if (!objs.some(o => o.id === S.sel)) S.sel = null;
+  layout(); renderList(); save(LS_SCENE, { objs: JSON.parse(snap), unit: unit() }); redraw();
+}
+function setColor(id, color) {
+  const o = S.objs.find(o => o.id === id); if (!o) return;
+  o.color = color; o.rgb = hex2rgb(color); redraw();
+}
 function readForm() {
   const l = toMm(+$('#fL').value), w = toMm(+$('#fW').value), h = toMm(+$('#fH').value);
   if (!(l > 0 && w > 0 && h > 0)) { alert('Введите положительные размеры'); return null; }
@@ -615,7 +750,7 @@ const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&
 function renderList() {
   $('#list').innerHTML = S.objs.length ? S.objs.map(o => `
     <div class="obj ${o.id === S.sel ? 'sel' : ''}" data-id="${o.id}">
-      <span class="sw" style="background:${o.color}"></span>
+      <input type="color" class="sw" value="${o.color}" title="Цвет">
       <div class="on"><b>${esc(o.name)}</b><small>${fmt3(o)}</small></div>
       <button data-act="rot" title="Повернуть на 90°"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;vertical-align:-1px"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/></svg></button>
       <button data-act="dup" title="Копия"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;vertical-align:-1px"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 4H6a2 2 0 0 0-2 2v10"/></svg></button>
@@ -627,13 +762,14 @@ function select(id) {
   S.sel = id; const o = S.objs.find(o => o.id === id); if (o) fillForm(o);
   renderList(); redraw();
 }
-function delSelected() { if (!S.sel) return; S.objs = S.objs.filter(o => o.id !== S.sel); S.sel = null; changed(); }
+function delSelected() { if (!S.sel) return; S.objs = S.objs.filter(o => o.id !== S.sel); S.sel = null; changed(true); }
 function rotSelected(a) { const o = S.objs.find(o => o.id === S.sel); if (o) { o.rot += a; changed(); } }
 
 /* =====================================================================
    7. ЧЕРЧЕНИЕ И ЛИНЕЙКА
    ===================================================================== */
 function setMode(m) {
+  if (S.fly && m !== S.mode) toggleFly();
   S.mode = S.mode === m ? 'view' : m;
   if (S.mode !== 'draw') S.draw = { pts: [], hover: null };
   if (S.mode !== 'measure') S.measure = null;
@@ -682,38 +818,63 @@ function fitPhoto() {
    8. МЫШЬ, КОЛЕСО, КЛАВИАТУРА
    ===================================================================== */
 let drag = null;
+/* Сдвиг объекта мышью: экранное смещение → смещение по полу (в виде сбоку или с Ctrl — по высоте) */
+function dragObject(e) {
+  const o = S.objs.find(o => o.id === drag.id); if (!o) return;
+  const k = pxmm() * S.zoom, dx = (e.offsetX - drag.sx) / k, dy = (e.offsetY - drag.sy) / k;
+  const cy = Math.cos(S.yaw), sy = Math.sin(S.yaw), sp = Math.sin(S.pitch), cp = Math.cos(S.pitch);
+  const vertical = e.ctrlKey || e.metaKey || Math.abs(sp) < 0.35;
+  const z1 = vertical ? 0 : dy / sp;                     // смещение «вглубь» в координатах камеры
+  const st = +$('#fSnap').value, snap = v => st ? Math.round(v / st) * st : v;
+  o.ox = snap(drag.o[0] + cy * dx - sy * z1);             // обратный поворот камеры → мировые X/Z
+  o.oz = snap(drag.o[2] + sy * dx + cy * z1);
+  if (vertical) o.oy = Math.max(0, snap(drag.o[1] - dy / Math.max(Math.abs(cp), 0.2)));
+  redraw();
+}
 cv.addEventListener('pointerdown', e => {
-  cv.setPointerCapture(e.pointerId);
+  cv.setPointerCapture(e.pointerId); anim = null;
   const x = e.offsetX, y = e.offsetY;
   if (S.mode === 'draw' && e.button === 0) {
     if (closeEnough()) return finishSketch();
     S.draw.pts.push(toSketch(x, y, e.shiftKey)); redraw(); return;
   }
   if (S.mode === 'measure' && e.button === 0) { S.measure = { a: [x, y], b: [x, y] }; drag = { kind: 'measure' }; return; }
-  const kind = e.altKey && S.bg.img ? 'bg' : (e.button === 2 || e.button === 1 || e.shiftKey) ? 'pan' : 'rot';
-  drag = { kind, x, y, sx: x, sy: y };
-  if (kind !== 'rot' || S.mode === 'view') cv.style.cursor = 'grabbing';
+  let kind = e.altKey && S.bg.img ? 'bg' : (e.button === 2 || e.button === 1 || e.shiftKey) ? 'pan' : S.fly ? 'look' : 'rot';
+  let id = null;
+  if (kind === 'rot' && (id = hitTest(x, y))) { kind = 'obj'; if (id !== S.sel) select(id); }
+  const o = S.objs.find(o => o.id === id);
+  drag = { kind, id, x, y, sx: x, sy: y, o: o ? [o.ox || 0, o.oy || 0, o.oz || 0] : null };
+  cv.style.cursor = kind === 'obj' ? 'move' : 'grabbing';
 });
 cv.addEventListener('pointermove', e => {
   const x = e.offsetX, y = e.offsetY;
   if (S.mode === 'draw') { S.draw.hover = toSketch(x, y, e.shiftKey); redraw(); }
   if (!drag) return;
   if (drag.kind === 'measure') { S.measure.b = [x, y]; redraw(); return; }
+  if (drag.kind === 'obj') return dragObject(e);
   const dx = x - drag.x, dy = y - drag.y; drag.x = x; drag.y = y;
   if (drag.kind === 'rot') { S.yaw += dx * 0.01; S.pitch = Math.max(-Math.PI / 2, Math.min(Math.PI / 2, S.pitch + dy * 0.01)); }
+  else if (drag.kind === 'look') {        // осмотр: камера стоит на месте, поворачивается направление взгляда
+    const b0 = camAxes().b, cam = [S.tx + b0[0] * S.dist, S.ty + b0[1] * S.dist, S.tz + b0[2] * S.dist];
+    S.yaw += dx * 0.004; S.pitch = Math.max(-1.5, Math.min(1.5, S.pitch + dy * 0.004));
+    const b1 = camAxes().b; S.tx = cam[0] - b1[0] * S.dist; S.ty = cam[1] - b1[1] * S.dist; S.tz = cam[2] - b1[2] * S.dist;
+  }
   else if (drag.kind === 'pan') { S.panX += dx; S.panY += dy; }
   else if (drag.kind === 'bg') { const k = pxmm() * S.zoom; S.bg.x += dx / k; S.bg.y += dy / k; }
   redraw();
 });
 cv.addEventListener('pointerup', e => {
-  if (drag && drag.kind === 'rot' && Math.hypot(e.offsetX - drag.sx, e.offsetY - drag.sy) < 4) select(hitTest(e.offsetX, e.offsetY));
-  if (drag && drag.kind === 'measure') updateHud();
-  drag = null; cv.style.cursor = '';
+  const click = drag && Math.hypot(e.offsetX - drag.sx, e.offsetY - drag.sy) < 4;
+  if (drag && drag.kind === 'rot' && click) select(null);
+  if (drag && drag.kind === 'obj' && !click) { renderList(); persist(); }
+  drag = null; cv.style.cursor = ''; updateHud();
 });
+cv.addEventListener('dblclick', e => { const id = hitTest(e.offsetX, e.offsetY); if (id) focusObj(id); else if (!S.fly) fitAll(); });
 cv.addEventListener('contextmenu', e => e.preventDefault());
 cv.addEventListener('wheel', e => {
   e.preventDefault();
   if (e.altKey && S.bg.img) { S.bg.mpp *= Math.exp(-e.deltaY * 0.001); return redraw(); }
+  if (S.fly) { S.flySpeed = Math.max(20, Math.min(5000, S.flySpeed * Math.exp(-e.deltaY * 0.002))); return redraw(); }
   const old = S.zoom; let z = old * Math.exp(-e.deltaY * 0.0012);
   z = Math.max(0.05, Math.min(20, z)); if (Math.abs(z - 1) < 0.04 && Math.abs(old - 1) >= 1e-3) z = 1; // «прилипание» к 1:1
   // зум к курсору
@@ -739,27 +900,47 @@ function hitTest(x, y) {
 function onKey(e) {
   const t = e.target; if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) return;
   if (!$('#calib').hidden || !$('#help').hidden) { if (e.key === 'Escape') { $('#calib').hidden = true; $('#help').hidden = true; } return; }
+  if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ') { e.preventDefault(); return undo(); }
+  const FLY = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'Space', 'ShiftLeft', 'ShiftRight'];
+  if (S.fly && FLY.includes(e.code)) { e.preventDefault(); held.add(e.code); return; }
+  // стрелки — точный сдвиг выбранного (1 мм или шаг привязки, Shift ×10); PageUp/PageDown — высота
+  const sel = S.objs.find(o => o.id === S.sel);
+  if (sel && /^(Arrow|Page)/.test(e.key)) {
+    e.preventDefault();
+    const st = (+$('#fSnap').value || 1) * (e.shiftKey ? 10 : 1), a = camAxes();
+    const flat = v => { const n = Math.hypot(v[0], v[2]) || 1; return [v[0] / n, v[2] / n]; };
+    const r = flat(a.r), f = flat(a.b.map(x => -x));   // «вглубь» экрана по полу
+    const mv = { ArrowRight: [r, 1], ArrowLeft: [r, -1], ArrowUp: [f, 1], ArrowDown: [f, -1] }[e.key];
+    if (mv) { sel.ox = (sel.ox || 0) + mv[0][0] * mv[1] * st; sel.oz = (sel.oz || 0) + mv[0][1] * mv[1] * st; }
+    if (e.key === 'PageUp') sel.oy = (sel.oy || 0) + st;
+    if (e.key === 'PageDown') sel.oy = Math.max(0, (sel.oy || 0) - st);
+    persist(); return redraw();
+  }
   const k = e.key.toLowerCase();
   const map = {
+    'f': toggleFly, 'а': toggleFly, 't': toggleOrbit, 'е': toggleOrbit, '0': fitAll,
     '1': () => setView('front'), '2': () => setView('top'), '3': () => setView('side'), '4': () => setView('iso'),
     'r': resetView, 'к': resetView, 'o': togglePersp, 'щ': togglePersp,
     'd': () => setMode('draw'), 'в': () => setMode('draw'), 'm': () => setMode('measure'), 'ь': () => setMode('measure'),
     'q': () => rotSelected(-Math.PI / 12), 'й': () => rotSelected(-Math.PI / 12), 'e': () => rotSelected(Math.PI / 12), 'у': () => rotSelected(Math.PI / 12),
     'l': toggleLayout, 'д': toggleLayout, 'h': toggleCompact, 'р': toggleCompact, 'c': openCalib, 'с': openCalib,
     'delete': delSelected,
-    'escape': () => { if (S.mode !== 'view') setMode(S.mode); else select(null); },
+    'escape': () => { if (S.fly) toggleFly(); else if (S.mode !== 'view') setMode(S.mode); else select(null); },
     'enter': () => S.mode === 'draw' && finishSketch(),
     'backspace': () => { if (S.mode === 'draw') { S.draw.pts.pop(); redraw(); } else delSelected(); },
   };
   if (map[k] && !e.ctrlKey && !e.metaKey) { e.preventDefault(); map[k](); }
 }
 document.addEventListener('keydown', onKey);
+const onKeyUp = e => held.delete(e.code);
+document.addEventListener('keyup', onKeyUp);
+window.addEventListener('blur', () => held.clear());
 
 /* =====================================================================
    9. ПАНЕЛЬ: кнопки и поля
    ===================================================================== */
 function togglePersp() { S.persp = !S.persp; $('#camOrtho').classList.toggle('on', !S.persp); $('#camPersp').classList.toggle('on', S.persp); redraw(); }
-function toggleLayout() { S.layout = S.layout === 'row' ? 'over' : 'row'; $('#layRow').classList.toggle('on', S.layout === 'row'); $('#layOver').classList.toggle('on', S.layout !== 'row'); changed(); }
+function toggleLayout() { S.layout = S.layout === 'row' ? 'over' : 'row'; $('#layRow').classList.toggle('on', S.layout === 'row'); $('#layOver').classList.toggle('on', S.layout !== 'row'); changed(true); }
 function toggleCompact() { document.body.classList.toggle('compact'); redraw(); }
 
 $('#btnAdd').onclick = () => { const f = readForm(); if (f) { addObj(f); fillForm(S.objs[S.objs.length - 1]); $('#fColor').value = PALETTE[(S.nextId - 1) % PALETTE.length]; } };
@@ -778,12 +959,19 @@ $('#fPreset').innerHTML = PRESETS.map((p, i) => `<option value="${i}">${p[0]} �
 $('#btnPreset').onclick = () => { const p = PRESETS[$('#fPreset').value]; addObj({ name: p[0], type: p[1], l: p[2], w: p[3], h: p[4], color: '#B9B6B0' }); };
 $('#list').onclick = e => {
   const row = e.target.closest('.obj'); if (!row) return; const id = +row.dataset.id, act = e.target.dataset.act;
+  if (e.target.classList.contains('sw')) return;
   if (act === 'del') { S.sel = id; return delSelected(); }
   if (act === 'rot') { S.sel = id; return rotSelected(Math.PI / 2); }
-  if (act === 'dup') { const o = S.objs.find(o => o.id === id); const { mesh, _pv, id: _, ...c } = o; return addObj({ ...c, name: o.name + ' (копия)' }); }
+  if (act === 'dup') { const o = S.objs.find(o => o.id === id); const { mesh, _pv, id: _, ...c } = o; return addObj({ ...c, ox: 0, oy: 0, oz: 0, name: o.name + ' (копия)' }); }
   select(id);
 };
-$('#btnClear').onclick = () => { if (S.objs.length && confirm('Удалить все объекты?')) { S.objs = []; S.sel = null; changed(); } };
+$('#btnClear').onclick = () => { if (S.objs.length && confirm('Удалить все объекты?')) { S.objs = []; S.sel = null; changed(true); } };
+$('#list').oninput = e => { if (e.target.classList.contains('sw')) setColor(+e.target.closest('.obj').dataset.id, e.target.value); };
+$('#list').onchange = e => { if (e.target.classList.contains('sw')) { if (+e.target.closest('.obj').dataset.id === S.sel) $('#fColor').value = e.target.value; persist(); } };
+$('#fColor').oninput = e => { if (S.sel) { setColor(S.sel, e.target.value); const sw = $(`.obj[data-id="${S.sel}"] .sw`); if (sw) sw.value = e.target.value; } };
+$('#fColor').onchange = () => S.sel && persist();
+$('#btnResetPos').onclick = () => { S.objs.forEach(o => { o.ox = o.oy = o.oz = 0; }); changed(true); };
+$('#btnFly').onclick = toggleFly; $('#btnOrbit').onclick = toggleOrbit; $('#btnFit').onclick = fitAll;
 $('#camOrtho').onclick = () => S.persp && togglePersp();
 $('#camPersp').onclick = () => !S.persp && togglePersp();
 document.querySelectorAll('[data-view]').forEach(b => b.onclick = () => setView(b.dataset.view));
@@ -924,7 +1112,7 @@ $('#btnPip').onclick = async () => {
   pip.document.title = 'Размер 1:1'; pip.document.body.classList.add('pip');
   pip.document.body.appendChild(wrap);
   ctx = cv.getContext('2d');
-  pip.document.addEventListener('keydown', onKey);
+  pip.document.addEventListener('keydown', onKey); pip.document.addEventListener('keyup', onKeyUp);
   pip.addEventListener('resize', redraw);
   pip.addEventListener('pagehide', () => { home.appendChild(wrap); redraw(); });
   $('#btnPip').classList.add('on'); redraw();
@@ -951,7 +1139,7 @@ window.matchMedia && setInterval(() => { /* следим за сменой зу�
   }
   ['#fL', '#fW', '#fH'].forEach((s, i) => $(s).value = fromMm([150, 100, 80][i]));
   $('#fExtH').value = fromMm(50);
-  layout(); renderList(); updateCalStatus(); redraw();
+  layout(true); renderList(); persist(); updateCalStatus(); redraw();
   if (screenInfo().src === 'none') setTimeout(openCalib, 400);   // первый запуск — сразу калибровка
 })();
 </script>
