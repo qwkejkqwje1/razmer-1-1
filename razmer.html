@@ -28,7 +28,8 @@ summary{font-weight:600;cursor:pointer;padding:2px 0;list-style:none}
 summary::before{content:"▸ ";color:var(--mut)}details[open] summary::before{content:"▾ "}
 label{display:block;color:var(--mut);font-size:12px;margin:6px 0 2px}
 input,select,button{font:inherit;color:inherit}
-input[type=number],input[type=text],select{width:100%;padding:5px 7px;border:1px solid var(--line);border-radius:6px;background:#fff}
+input[type=number],input[type=text],select,textarea{width:100%;padding:5px 7px;border:1px solid var(--line);border-radius:6px;background:#fff}
+textarea{font:inherit;color:inherit;resize:vertical;min-height:34px}
 input[type=color]{width:36px;height:30px;border:1px solid var(--line);border-radius:6px;padding:2px;background:#fff}
 input[type=range]{width:100%}
 .g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}
@@ -70,6 +71,26 @@ kbd{font:11px ui-monospace,monospace;background:var(--sec);border:1px solid var(
 .chk{display:flex!important;align-items:center;gap:6px;color:var(--ink)!important;font-size:13px!important;margin:4px 0!important}
 .chk input{margin:0}
 .obj small .x{color:var(--acc);font-weight:600}
+#toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);max-width:min(560px,92vw);background:#2C2C2B;color:#fff;padding:8px 14px;border-radius:8px;font-size:13px;z-index:30;opacity:0;transition:opacity .2s;pointer-events:none;text-align:center}
+#toast.on{opacity:.95}
+#calSheet{border:2px solid var(--acc);border-bottom-style:dashed;background:repeating-linear-gradient(0deg,#fff 0 9px,#F3F2F0 9px 10px);position:relative;flex:none}
+#calSheet span{position:absolute;left:8px;top:6px;color:var(--mut);font-size:12px}
+#calStage{overflow:hidden}
+.mbox.wide{max-width:98vw}
+.mbox select{max-width:100%}
+@media (max-width:760px){
+  #app{display:block}
+  #wrap{position:fixed;inset:0}
+  #side{position:fixed;left:0;right:0;bottom:0;width:auto;max-height:60vh;z-index:6;border-right:none;border-top:1px solid var(--line);border-radius:14px 14px 0 0;box-shadow:0 -6px 24px rgba(0,0,0,.14);padding:10px 14px calc(18px + env(safe-area-inset-bottom))}
+  button{min-height:36px;padding:7px 12px}
+  #fab button{min-height:34px;padding:6px 11px;font-size:13px}
+  input[type=number],input[type=text],select,textarea{font-size:16px;padding:7px 8px}
+  #tip{display:none}
+  .mbox{padding:14px 12px}
+  .modal{align-items:flex-start;padding-top:8px}
+  #toast{bottom:calc(14px + env(safe-area-inset-bottom))}
+  body:not(.compact) #toast{bottom:calc(61vh + 8px)}
+}
 #calRuler{height:34px;border-bottom:2px solid #333;border-left:2px solid #333;border-right:2px solid #333;background-repeat:repeat-x;background-position:left bottom}
 </style>
 </head>
@@ -89,6 +110,7 @@ kbd{font:11px ui-monospace,monospace;background:var(--sec);border:1px solid var(
       <option value="cone">Конус</option>
       <option value="pyr">Пирамида</option>
       <option value="sph">Шар / эллипсоид</option>
+      <option value="person">Человек (для масштаба)</option>
     </select>
     <label>Название</label><input id="fName" type="text" value="Мой объект">
     <div class="g3">
@@ -98,8 +120,11 @@ kbd{font:11px ui-monospace,monospace;background:var(--sec);border:1px solid var(
     </div>
     <div class="vol" id="fVolOut"></div>
     <p class="hint" id="fHint">Порядок как в магазинах: Д × Ш × В. Длина — влево-вправо, ширина — вглубь, высота — вверх.</p>
+    <label>Или вставьте описание товара — размеры найдутся сами</label>
+    <div class="row" style="margin-top:0;flex-wrap:nowrap;align-items:stretch"><textarea id="fText" rows="2" placeholder="Габариты (Ш×Г×В): 60×55×85 см"></textarea><button id="fTextGo" title="Найти размеры в тексте и добавить объект">Добавить</button></div>
+    <div class="hint" id="fTextOut">Можно просто нажать <kbd>Ctrl</kbd>+<kbd>V</kbd> в любом месте окна.</div>
     <div class="row">
-      <select id="fUnit" style="width:auto"><option value="mm">мм</option><option value="cm" selected>см</option></select>
+      <select id="fUnit" style="width:auto"><option value="mm">мм</option><option value="cm" selected>см</option><option value="in">дюймы</option></select>
       <input id="fColor" type="color" value="#5E9FE8">
       <button id="btnAdd" class="primary">Добавить</button>
       <button id="btnApply" disabled>Обновить выбранный</button>
@@ -139,10 +164,30 @@ kbd{font:11px ui-monospace,monospace;background:var(--sec);border:1px solid var(
     <div class="row"><button id="btnPreset">Поставить рядом</button></div>
   </details>
 
+  <details open id="fitSec"><summary>Влезет ли?</summary>
+    <div class="g2">
+      <div><label>Что</label><select id="fitWhat"></select></div>
+      <div><label>Куда</label><select id="fitWhere"></select></div>
+    </div>
+    <div class="g2">
+      <div><label>Стенки «Куда», мм</label><input id="fitWall" type="number" min="0" step="any" value="0"></div>
+      <div style="display:flex;align-items:flex-end"><label class="chk" title="Разрешить класть коробку на бок или торцом"><input id="fitSide" type="checkbox" checked> можно на бок</label></div>
+    </div>
+    <div class="vol" id="fitOut"></div>
+    <div class="row"><button id="fitShow" disabled title="Повернуть как надо и поставить внутрь">Поставить внутрь</button><button id="fitSwap" title="Поменять местами">⇄</button></div>
+  </details>
+
   <details open><summary>Объекты на сцене</summary>
     <div id="list"></div>
     <p class="hint">Тяните объект мышью, чтобы передвинуть (<kbd>Ctrl</kbd> — поднять). Стрелки — точно, <kbd>PgUp</kbd>/<kbd>PgDn</kbd> — высота. Квадратик слева — цвет.</p>
-    <div class="row"><button id="btnResetPos">Вернуть на места</button><button id="btnClear">Очистить всё</button></div>
+    <div class="row"><button id="btnUndo" title="Отменить (Ctrl+Z)" disabled>↶ Отменить</button><button id="btnRedo" title="Повторить (Ctrl+Y)" disabled>↷ Повторить</button>
+      <button id="btnResetPos">Вернуть на места</button><button id="btnClear">Очистить всё</button></div>
+  </details>
+
+  <details><summary>Сохранить и поделиться</summary>
+    <div class="row" style="margin-top:2px"><button id="btnShare">🔗 Ссылка на сцену</button><button id="btnSave">💾 Сохранить в файл</button><button id="btnOpen">📂 Открыть файл</button>
+      <input id="fScene" type="file" accept=".json,application/json" hidden></div>
+    <p class="hint">Сцена и фото-подложка и так сохраняются в этом браузере. Ссылка содержит всю сцену прямо в адресе — её можно отправить в мессенджер. Файл <kbd>.json</kbd> можно открыть кнопкой или перетащить на окно.</p>
   </details>
 
   <details open><summary>Вид</summary>
@@ -189,7 +234,9 @@ kbd{font:11px ui-monospace,monospace;background:var(--sec);border:1px solid var(
     <div class="row" style="margin-top:2px">
       <button id="btnPip">📌 Поверх всех окон</button><button id="btnCompact">Скрыть панель</button>
       <button id="btnFull">Полный экран</button><button id="btnPng">Сохранить PNG</button>
+      <button id="btnPrint" title="Напечатать сцену в натуральную величину на листах А4 (Ctrl+P)">🖨 Печать 1:1</button>
     </div>
+    <p class="hint">Печать 1:1 режет сцену на листы А4 в точном масштабе (текущий ракурс, без перспективы). На каждом листе — полоска 10 см для проверки.</p>
   </details>
 </aside>
 
@@ -201,6 +248,8 @@ kbd{font:11px ui-monospace,monospace;background:var(--sec);border:1px solid var(
 </main>
 </div>
 
+<div id="toast" role="status" aria-live="polite"></div>
+
 <!-- Окно калибровки -->
 <div id="calib" class="modal" hidden><div class="mbox">
   <h2>Размер экрана</h2>
@@ -211,9 +260,11 @@ kbd{font:11px ui-monospace,monospace;background:var(--sec);border:1px solid var(
   <p class="hint" id="calText"></p>
   <div class="row"><select id="calRef" style="width:auto">
     <option value="card">Банковская карта 85,60 × 53,98 мм</option>
-    <option value="ruler">Обычная линейка 100 мм</option>
+    <option value="a4">Лист А4 вертикально — 210 мм</option>
+    <option value="a4l">Лист А4 горизонтально — 297 мм</option>
+    <option value="ruler">Обычная линейка</option>
   </select></div>
-  <div id="calStage"><div id="calCard"></div><div id="calRuler" hidden></div></div>
+  <div id="calStage"><div id="calCard"></div><div id="calRuler" hidden></div><div id="calSheet" hidden><span>Лист А4</span></div></div>
   <input id="calSlider" type="range" min="1.5" max="12" step="0.001">
   <div class="row"><button data-cal="-1">− точнее</button><button data-cal="1">+ точнее</button><span id="calInfo" class="hint"></span></div>
   <div class="row">Или диагональ экрана: <input id="calDiag" type="number" step="0.1" placeholder="27" style="width:80px"> дюймов <button id="calDiagBtn">Рассчитать</button></div>
@@ -221,15 +272,18 @@ kbd{font:11px ui-monospace,monospace;background:var(--sec);border:1px solid var(
 </div></div>
 
 <!-- Справка -->
-<div id="help" class="modal" hidden><div class="mbox" style="max-width:640px">
+<div id="help" class="modal" hidden><div class="mbox" style="max-width:680px">
   <h2>Как пользоваться</h2>
   <ol>
-    <li><b>Размер экрана (один раз).</b> Запустите <b>detect-screen</b> из папки программы — размер считается прямо из монитора. Для проверки приложите карту в окне «Калибровка».</li>
-    <li><b>Объект.</b> Введите размеры товара (Д × Ш × В) → «Добавить». При виде «Спереди», ортографической камере и масштабе 1:1 передняя грань на экране точно равна реальной.</li>
-    <li><b>Сравнение.</b> Поставьте рядом знакомый предмет: телефон, лист А4, банку колы.</li>
-    <li><b>Объём и литры.</b> Объём каждого объекта виден в списке и подписи. В блоке «Объём и литры» введите, например, 20 л — появится куб, шар или коробка ровно такого объёма. «💧 Налить воду» показывает уровень воды внутри выбранного объекта; «Литровые кубики» делят коробки на кубы 10 см = 1 л.</li>
-    <li><b>Осмотр.</b> Тяните объект — передвинуть. По пустому месту: левая кнопка — вращать, правая (или <kbd>Shift</kbd>) — двигать, колесо — зум (<kbd>R</kbd> вернёт 1:1). <kbd>F</kbd> — режим полёта.</li>
-    <li><b>Поверх браузера.</b> «📌 Поверх всех окон» открывает мини-окно, которое висит над магазином. Или вставьте скриншот товара <kbd>Ctrl</kbd>+<kbd>V</kbd>.</li>
+    <li><b>Размер экрана (один раз).</b> Запустите <b>detect-screen</b> из папки программы — размер считается прямо из монитора. Без утилиты — окно «Калибровка»: банковская карта, лист А4 или линейка; для Mac, iPhone и iPad — выбор модели. У каждого монитора своя калибровка, переключение автоматическое.</li>
+    <li><b>Объект.</b> Введите размеры (Д × Ш × В) → «Добавить». Можно просто вставить текст из магазина — «Габариты: 60 x 45 x 85 см», «24 x 16 in» — в поле «Или вставьте описание товара» или нажать <kbd>Ctrl</kbd>+<kbd>V</kbd> прямо на странице. Понимает мм, см, м и дюймы.</li>
+    <li><b>Сравнение.</b> Поставьте рядом знакомый предмет: телефон, А4, банку колы — или крупный: человека 175 см, диван, холодильник, дверь.</li>
+    <li><b>Влезет ли?</b> Выберите, что и куда (коробка, шкаф, чемодан, аквариум) — программа переберёт повороты, учтёт толщину стенок и скажет, сколько штук поместится. «Поставить внутрь» покажет это на сцене.</li>
+    <li><b>Объём и литры.</b> Объём каждого объекта — в списке и подписи. «Показать объём» ставит куб, шар или коробку ровно на 20 л; «💧 Налить воду» показывает уровень воды внутри; «Литровые кубики» делят коробки на кубы 10 см = 1 л.</li>
+    <li><b>Осмотр.</b> Тяните объект — передвинуть. По пустому месту: левая кнопка — вращать, правая (или <kbd>Shift</kbd>) — двигать, колесо — зум (<kbd>R</kbd> вернёт 1:1). На телефоне: один палец — вращать, два — зум и сдвиг, двойной тап — показать всё / подлететь к объекту.</li>
+    <li><b>Сохранить и поделиться.</b> «🔗 Ссылка на сцену» копирует адрес со всей сценой внутри — отправьте его или откройте на другом устройстве. «💾 Сохранить в файл» — сцена в .json; открыть — кнопкой или перетащив файл в окно.</li>
+    <li><b>Печать 1:1.</b> «🖨 Печать 1:1» (<kbd>Ctrl</kbd>+<kbd>P</kbd>) режет сцену на листы А4 в натуральную величину. В окне печати выберите масштаб 100 % и проверьте полоску 10 см линейкой.</li>
+    <li><b>Поверх браузера.</b> «📌 Поверх всех окон» открывает мини-окно над магазином. Или вставьте скриншот товара <kbd>Ctrl</kbd>+<kbd>V</kbd> и подгоните его линейкой.</li>
   </ol>
   <table class="keys">
     <tr><td><kbd>1</kbd>–<kbd>4</kbd></td><td>Спереди / Сверху / Сбоку / 3D</td></tr>
@@ -237,8 +291,10 @@ kbd{font:11px ui-monospace,monospace;background:var(--sec);border:1px solid var(
     <tr><td><kbd>F</kbd></td><td>Полёт: <kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd>, <kbd>E</kbd>/<kbd>Q</kbd> — вверх/вниз, мышь — осмотр, колесо — скорость</td></tr>
     <tr><td><kbd>T</kbd></td><td>Автооблёт вокруг сцены</td></tr>
     <tr><td><kbd>0</kbd> / двойной клик</td><td>Показать всё / подлететь к объекту</td></tr>
-    <tr><td>Мышь по объекту</td><td>Передвинуть (<kbd>Ctrl</kbd> — по высоте), стрелки — точно</td></tr>
-    <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd></td><td>Отменить</td></tr>
+    <tr><td>Мышь по объекту</td><td>Передвинуть (<kbd>Ctrl</kbd> — по высоте), стрелки — точно, <kbd>PgUp</kbd>/<kbd>PgDn</kbd> — выше/ниже</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd></td><td>Отменить / повторить</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>V</kbd></td><td>Вставить размеры текстом, фото или данные монитора</td></tr>
+    <tr><td><kbd>Ctrl</kbd>+<kbd>P</kbd></td><td>Печать 1:1 на листах А4</td></tr>
     <tr><td><kbd>O</kbd></td><td>Орто / перспектива</td></tr>
     <tr><td><kbd>D</kbd> / <kbd>M</kbd></td><td>Черчение / линейка, <kbd>Esc</kbd> — выход</td></tr>
     <tr><td><kbd>Q</kbd> / <kbd>E</kbd></td><td>Повернуть выбранный на 15°</td></tr>
@@ -247,7 +303,7 @@ kbd{font:11px ui-monospace,monospace;background:var(--sec);border:1px solid var(
     <tr><td><kbd>H</kbd></td><td>Скрыть / показать панель</td></tr>
     <tr><td><kbd>C</kbd></td><td>Калибровка</td></tr>
   </table>
-  <p class="hint">Важно: зум браузера (<kbd>Ctrl</kbd>+колесо) программа учитывает автоматически, перекалибровка не нужна.</p>
+  <p class="hint">Зум браузера (<kbd>Ctrl</kbd>+колесо) учитывается автоматически, перекалибровка не нужна. Исключения: в Safari держите зум 100 % (<kbd>⌘</kbd>+<kbd>0</kbd>), на iPhone — масштаб текста «аА» 100 %, на телефоне не увеличивайте страницу двумя пальцами поверх программы — программа предупредит.</p>
   <div class="row" style="justify-content:flex-end"><button id="helpClose" class="primary">Понятно</button></div>
 </div></div>
 
@@ -304,6 +360,12 @@ const OS_SCALES = [1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 3, 3.5, 4];
 const ZOOMS = [0.25, 1 / 3, 0.5, 2 / 3, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5];
 const nearest = (list, v, tol) => { let b = null; for (const q of list) if (Math.abs(v / q - 1) <= tol && (b === null || Math.abs(v / q - 1) < Math.abs(v / b - 1))) b = q; return b; };
 const IS_FF = /Firefox\//.test(navigator.userAgent), IS_MAC = /Mac/.test(navigator.platform || navigator.userAgent);
+const IS_IOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const IS_IPHONE = /iPhone|iPod/.test(navigator.userAgent);
+const IS_SAFARI = /Safari\//.test(navigator.userAgent) && !/Chrome\/|Chromium\/|CriOS|FxiOS|EdgiOS|Edg\/|OPR\/|Firefox\//.test(navigator.userAgent);
+/* Несколько мониторов: Chrome/Edge сообщают screen.isExtended и положение экрана — так различаем
+   два монитора с одинаковым разрешением (у каждого своя калибровка) */
+const posSfx = () => { const s = win().screen; return s.isExtended ? `@${s.availLeft ?? 0},${s.availTop ?? 0}` : ''; };
 const near = (a, b) => Math.abs(a - b) <= 2;
 function rawScr() { const w = win(), s = w.screen; return { d: w.devicePixelRatio || 1, cw: s.width, ch: s.height }; }
 /* Оценка зума по окну: в Chromium outerWidth — в точках экрана, innerWidth — в CSS-пикселях */
@@ -330,10 +392,20 @@ function scr() {
 const scrKey = () => { const s = scr(); return s.nw + 'x' + s.nh; };
 const legacyKey = () => { const s = rawScr(); return Math.round(s.cw * s.d) + 'x' + Math.round(s.ch * s.d); };  // как в прошлых версиях
 const keyNear = () => { const s = scr(); return Object.keys(calibs).find(k => { const [w, h] = k.split('x').map(Number); return near(w, s.nw) && near(h, s.nh); }); };
-const calibFor = () => calibs[scrKey()] || calibs[legacyKey()] || calibs[keyNear()];
-const dropCalib = () => { delete calibs[scrKey()]; delete calibs[legacyKey()]; const k = keyNear(); if (k) delete calibs[k]; save(LS_CALS, calibs); };
+const calibKey = () => scrKey() + posSfx();
+function calibEntry() {                                    // [ключ, запись] для текущего экрана
+  for (const k of [calibKey(), scrKey(), legacyKey(), keyNear()]) if (k && calibs[k]) return [k, calibs[k]];
+  return [null, null];
+}
+const calibFor = () => calibEntry()[1];
+const dropCalib = () => { for (let k, g = 0; (k = calibEntry()[0]) && g < 9; g++) delete calibs[k]; save(LS_CALS, calibs); };
+/* Если подходят несколько мониторов (одинаковое разрешение, разный размер) — пользователь выбирает сам */
+const LS_PICK = 'r11.edidpick';
+let picks = load(LS_PICK) || {};
+const edidId = e => `${e.n || ''}|${e.w}x${e.h}|${e.x}x${e.y}`;
+const pickKey = () => { const s = rawScr(); return s.cw + 'x' + s.ch + posSfx(); };
 /* Какая запись EDID соответствует экрану, на котором сейчас окно */
-function matchEdid() {
+function edidMatch() {
   const s = rawScr(), ok = e => e && e.w > 50 && e.h > 30 && e.x > 0 && e.y > 0, size = e => e.w + 'x' + e.h;
   const tiers = [
     e => near(e.x, s.cw * s.d) && near(e.y, s.ch * s.d),                      // зум страницы 100 % (или Firefox)
@@ -341,16 +413,39 @@ function matchEdid() {
     e => Math.abs(e.x / e.y - s.cw / s.ch) < 0.01,                          // масштабированный (не родной) режим
   ];
   for (const t of tiers) {
-    let c = edid.filter(e => ok(e) && t(e));
+    const c = edid.filter(e => ok(e) && t(e));
     if (new Set(c.map(size)).size > 1) {                                     // неоднозначно — уточняем по зуму
-      const z = zoomGuess();
-      c = z ? c.filter(e => near(e.x, s.cw * s.d / z)) : [];
-      if (new Set(c.map(size)).size !== 1) return null;                     // не гадаем
+      const z = zoomGuess(), cz = z ? c.filter(e => near(e.x, s.cw * s.d / z)) : [];
+      if (new Set(cz.map(size)).size === 1) return { e: cz[0], cands: [] };
+      const pool = [...new Map((cz.length ? cz : c).map(e => [edidId(e), e])).values()];
+      const pe = pool.find(e => edidId(e) === picks[pickKey()]) || labelPick(pool);   // выбор пользователя или имя от браузера
+      return { e: pe || null, cands: pool, picked: !!pe };
     }
-    if (c.length) return c[0];
+    if (c.length) return { e: c[0], cands: [] };
   }
-  return null;
+  return { e: null, cands: [] };
 }
+const matchEdid = () => edidMatch().e;
+/* Chrome/Edge умеют назвать монитор (Window Management API, нужно разрешение) — тогда выбирать вручную не нужно */
+let scrLabel = '', scrDetails = null;
+async function readScreenLabel(ask) {
+  if (!('getScreenDetails' in window)) return false;
+  try {
+    if (!ask) { const p = await navigator.permissions.query({ name: 'window-management' }); if (p.state !== 'granted') return false; }
+    if (!scrDetails) {
+      scrDetails = await window.getScreenDetails();
+      scrDetails.addEventListener('currentscreenchange', () => { scrLabel = scrDetails.currentScreen.label || ''; updateCalStatus(); redraw(); });
+    }
+    scrLabel = scrDetails.currentScreen.label || ''; updateCalStatus(); redraw(); return true;
+  } catch { return false; }
+}
+const labelPick = pool => {
+  const lb = scrLabel.toLowerCase().trim(); if (!lb) return null;
+  const m = pool.filter(e => e.n && (lb.includes(e.n.toLowerCase().trim()) || e.n.toLowerCase().includes(lb)));
+  return m.length === 1 ? m[0] : null;
+};
+/* Многие мониторы округляют свой размер до сантиметра — тогда точность хуже, стоит проверить по карте */
+const edidRounded = e => e && e.w % 10 === 0 && e.h % 10 === 0;
 /* Проверка достоверности EDID: пропорции мм должны совпадать с пропорциями пикселей */
 const edidSane = e => Math.abs((e.w / e.h) / (e.x / e.y) - 1) < 0.03;
 /* Размер экрана в CSS-пикселях при текущем зуме */
@@ -366,6 +461,8 @@ function screenInfo() {
   return { v: 96 / 25.4, src: 'none', bad: e && !edidSane(e) ? e : null };
 }
 function pxmm() { return screenInfo().v; }
+/* экранных px на мм модели: при печати — масштаб листа, иначе экран × зум */
+const scaleK = () => S.printK || pxmm() * S.zoom;
 function load(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } }
 function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
 
@@ -390,17 +487,32 @@ const PRESETS = [
 /* Для сравнения объёмов (наружные размеры, мм) */
 const PRESETS_VOL = [
   ['Кубик 1 л (10 см)',            'box', 100, 100, 100],
-  ['Пакет молока 1 л',             'box', 95, 64, 166],
-  ['Литровая банка',               'cyl', 100, 100, 135],
-  ['Кастрюля 3 л',                 'cyl', 180, 180, 120],
+  ['Пакет молока 1 л',             'box', 95, 64, 166, 0.5],
+  ['Литровая банка',               'cyl', 102, 102, 135, 2],
+  ['Кастрюля 3 л',                 'cyl', 180, 180, 120, 1],
   ['Куб 10 л (21,5 см)',           'box', 215.44, 215.44, 215.44],
   ['Городской рюкзак ≈25 л',       'box', 300, 180, 450],
   ['Ручная кладь 55×40×20 см',     'box', 400, 200, 550],
-  ['Аквариум ≈60 л (60×30×35 см)', 'box', 600, 300, 350],
+  ['Аквариум ≈60 л (60×30×35 см)', 'box', 600, 300, 350, 5],
   ['Куб 100 л (46,4 см)',          'box', 464.16, 464.16, 464.16],
   ['Куб 1 м³ = 1000 л',            'box', 1000, 1000, 1000],
 ];
-const ALL_PRESETS = PRESETS.concat(PRESETS_VOL);
+/* Крупные вещи — для них пригодятся «Показать всё» и человек рядом для масштаба */
+const PRESETS_BIG = [
+  ['Человек 175 см',               'person', 530, 275, 1750],
+  ['Диван трёхместный',            'box', 2100, 950, 850],
+  ['Кровать 160×200',              'box', 1600, 2000, 450],
+  ['Холодильник',                  'box', 600, 650, 1850],
+  ['Стиральная машина',            'box', 600, 600, 850],
+  ['Посудомоечная машина 45 см',   'box', 450, 600, 820],
+  ['Шкаф 160×60×240',              'box', 1600, 600, 2400],
+  ['Межкомнатная дверь 80 см',     'box', 800, 40, 2000],
+  ['Телевизор 55″',                'box', 1230, 60, 710],
+  ['Чемодан средний (M, 65 см)',   'box', 440, 260, 650],
+  ['Чемодан большой (L, 75 см)',   'box', 500, 300, 750],
+  ['Ванна 170×70',                 'box', 1700, 700, 580],
+];
+const ALL_PRESETS = PRESETS.concat(PRESETS_VOL, PRESETS_BIG);
 
 /* =====================================================================
    2. ГЕОМЕТРИЯ: построение сеток (вершины + грани)
@@ -432,8 +544,8 @@ function apexMesh(poly, h, smooth) {
   for (let a = 0; a < n; a++) f.push({ i: [a, (a + 1) % n, n], e: smooth ? [1,0,0] : null });
   return { v, f };
 }
-function meshSphere(l, w, h) {
-  const LAT = 18, LON = 36, v = [], f = [];
+function meshSphere(l, w, h, LAT = 18, LON = 36) {
+  const v = [], f = [];
   for (let i = 0; i <= LAT; i++) {
     const t = i / LAT * Math.PI, y = (1 - Math.cos(t)) / 2 * h, r = Math.sin(t);
     for (let j = 0; j < LON; j++) { const a = j / LON * Math.PI * 2; v.push([Math.cos(a) * r * l / 2, y, Math.sin(a) * r * w / 2]); }
@@ -444,6 +556,26 @@ function meshSphere(l, w, h) {
   }
   return { v, f };
 }
+/* Человек для масштаба: ступни, ноги, руки, туловище, шея, голова — выпуклые части.
+   Части заданы для габарита 530 × 275 × 1750 мм (рост 175 см) и растягиваются под Д × Ш × В объекта. */
+function meshPerson(l, w, h) {
+  const sx = l / 530, sy = h / 1750, sz = w / 275, v = [], f = [];
+  const add = (m, dx, dy, dz) => {
+    const o = v.length, b = bbox(m.v), c = [dx * sx, ((b[1] + b[4]) / 2 + dy) * sy, dz * sz];   // центр части — для нормалей
+    m.v.forEach(([x, y, z]) => v.push([(x + dx) * sx, (y + dy) * sy, (z + dz) * sz]));
+    m.f.forEach(fc => f.push({ i: fc.i.map(i => i + o), e: fc.e, c }));
+  };
+  const box = (x0, x1, y0, y1, z0, z1) => add(meshBox(x1 - x0, z1 - z0, y1 - y0), (x0 + x1) / 2, y0, (z0 + z1) / 2);
+  for (const s of [-1, 1]) {
+    box(s > 0 ? 47 : -143, s > 0 ? 143 : -47, 0, 60, -80, 170);       // ступня
+    box(s > 0 ? 30 : -150, s > 0 ? 150 : -30, 60, 870, -70, 70);       // нога
+    box(s > 0 ? 183 : -265, s > 0 ? 265 : -183, 780, 1415, -50, 50);   // рука
+  }
+  box(-180, 180, 870, 1430, -100, 100);                                 // туловище
+  add(prism(ellipse(55, 55, 16), 95, true), 0, 1430, 0);               // шея
+  add(meshSphere(170, 210, 230, 10, 16), 0, 1520, 0);                  // голова
+  return { v, f };
+}
 function buildMesh(o) {
   const { l, w, h } = o;
   switch (o.type) {
@@ -451,7 +583,8 @@ function buildMesh(o) {
     case 'cone': return apexMesh(ellipse(l / 2, w / 2, 48), h, true);
     case 'pyr':  return apexMesh([[-l/2,-w/2],[l/2,-w/2],[l/2,w/2],[-l/2,w/2]], h, false);
     case 'sph':  return meshSphere(l, w, h);
-    case 'ext':  return prism(o.pts, h, false);
+    case 'ext':  return Object.assign(prism(o.pts, h, false), { poly: o.pts });
+    case 'person': return meshPerson(l, w, h);
     default:     return meshBox(l, w, h);
   }
 }
@@ -498,7 +631,7 @@ function sceneCenter() {
    ===================================================================== */
 function makeProj() {
   const cy = Math.cos(S.yaw), sy = Math.sin(S.yaw), cp = Math.cos(S.pitch), sp = Math.sin(S.pitch);
-  const k = pxmm() * S.zoom, ox = S.W / 2 + S.panX, oy = S.H / 2 + S.panY;
+  const k = scaleK(), ox = S.W / 2 + S.panX, oy = S.H / 2 + S.panY;
   const view = p => {                                          // мир → координаты камеры
     const x = p[0] - S.tx, y = p[1] - S.ty, z = p[2] - S.tz;
     const x1 = cy * x + sy * z, z1 = -sy * x + cy * z;
@@ -519,9 +652,10 @@ function camAxes() {
 /* ---------- Плавные перелёты камеры ---------- */
 let anim = null;
 function flyTo(to, ms = 600) {
+  if (anim && anim.to) for (const k in anim.to) if (!(k in to)) to[k] = anim.to[k];   // не обрывать начатый перелёт: «вид» + «показать всё» складываются
   const from = {}; for (const k in to) from[k] = S[k];
   if ('yaw' in to) { const d = ((to.yaw - from.yaw) % (2 * Math.PI) + 3 * Math.PI) % (2 * Math.PI) - Math.PI; to.yaw = from.yaw + d; }
-  const id = {}; anim = id; let t0 = null;
+  const id = { to }; anim = id; let t0 = null;
   const step = t => {
     if (anim !== id) return; if (t0 === null) t0 = t;
     let u = Math.min(1, (t - t0) / ms); u = u < 0.5 ? 4 * u * u * u : 1 - Math.pow(-2 * u + 2, 3) / 2; // ease-in-out
@@ -531,14 +665,16 @@ function flyTo(to, ms = 600) {
   win().requestAnimationFrame(step);
 }
 /* Показать всё: вписать сцену в окно (масштаб уже не 1:1!) */
-function fitAll() {
+function fitAll(max1) {            // max1 — не увеличивать больше 1:1 (для открытых сцен)
   if (!S.objs.length) return;
-  const c = sceneCenter(), keep = { tx: S.tx, ty: S.ty, tz: S.tz, panX: S.panX, panY: S.panY, zoom: S.zoom };
-  Object.assign(S, c, { panX: 0, panY: 0, zoom: 1 });
+  if (!S.W && !S.printing) fitCanvas();
+  const c = sceneCenter(), keep = { tx: S.tx, ty: S.ty, tz: S.tz, panX: S.panX, panY: S.panY, zoom: S.zoom, yaw: S.yaw, pitch: S.pitch };
+  const tgt = anim && anim.to || {};   // если камера ещё поворачивается — вписываем для конечного вида
+  Object.assign(S, c, { panX: 0, panY: 0, zoom: 1 }, 'yaw' in tgt ? { yaw: tgt.yaw } : {}, 'pitch' in tgt ? { pitch: tgt.pitch } : {});
   const pts = S.objs.flatMap(worldVerts).map(makeProj()); Object.assign(S, keep);
   const xs = pts.map(p => p[0]), ys = pts.map(p => p[1]);
   const z = Math.min((S.W - 60) * 0.85 / (Math.max(...xs) - Math.min(...xs) || 1), (S.H - 60) * 0.85 / (Math.max(...ys) - Math.min(...ys) || 1));
-  flyTo({ ...c, panX: 0, panY: 0, zoom: Math.max(0.05, Math.min(20, z)) });
+  flyTo({ ...c, panX: 0, panY: 0, zoom: Math.max(0.05, Math.min(max1 === true ? 1 : 20, z)) });
 }
 /* Двойной клик по объекту — подлететь к нему в масштабе 1:1 */
 function focusObj(id) {
@@ -605,81 +741,221 @@ const shadeCol = (rgb, s) => `rgb(${rgb.map(c => Math.min(255, Math.round(c * s)
 
 function render() {
   dirty = false;
-  fitCanvas();
+  if (!S.printing) fitCanvas();
   const { W, H } = S;
   ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
   drawBg();
-  if (S.grid && !S.persp) drawGrid();
+  if (S.grid && !S.persp && !S.printing) drawGrid();
 
-  // --- 3D: собираем все грани, сортируем от дальних к ближним (алгоритм художника) ---
-  const P = makeProj(), items = [], nearZ = S.dist - 5;
+  const P = makeProj(), A = camAxes(), nearZ = S.dist - 5;
+  const cam = [S.tx + A.b[0] * S.dist, S.ty + A.b[1] * S.dist, S.tz + A.b[2] * S.dist];   // где камера (для перспективы)
   if (S.grid && S.persp) drawFloor(P);
-  const L = [-0.35, 0.75, 0.55], ll = Math.hypot(...L);
+  const nodes = [];
   for (const o of S.objs) {
     const wv = worldVerts(o), pv = wv.map(P); o._pv = pv; o._wv = wv;
-    const liq = o.fill && o.fill.vol > 0 ? liquidMesh(o) : null; o._liq = liq;
-    const parts = [[o.mesh.f, pv, false]];
-    if (liq) parts.push([liq.f, xform(o, liq.v).map(P), true]);      // вода внутри — отдельная сетка
-    for (const [faces, mpv, wet] of parts) for (const f of faces) {
-      const idx = f.i, n = idx.length; let d = 0, nx = 0, ny = 0, nz = 0;
-      if (S.persp && idx.some(i => mpv[i][2] > nearZ)) continue;   // грань за камерой — не рисуем
-      for (let a = 0; a < n; a++) {                    // нормаль методом Ньюэлла
-        const p = mpv[idx[a]], q = mpv[idx[(a + 1) % n]];
-        d += p[2];
-        nx += (p[4] - q[4]) * (p[2] + q[2]);
-        ny += (p[2] - q[2]) * (p[3] + q[3]);
-        nz += (p[3] - q[3]) * (p[4] + q[4]);
-      }
-      const nl = Math.hypot(nx, ny, nz) || 1;
-      const lit = 0.58 + 0.42 * Math.abs((nx * L[0] + ny * L[1] + nz * L[2]) / (nl * ll));
-      items.push({ o, f, d: d / n, lit, pv: mpv, wet });
-    }
+    const liq = o.fill && o.fill.vol > 0 && o.type !== 'person' ? liquidMesh(o) : null; o._liq = liq;
+    const nd = mkNode(o, o.mesh, wv, pv, false, A, cam, nearZ);
+    if (liq) { const lw = xform(o, liq.v); nd.liq = mkNode(o, liq, lw, lw.map(P), true, A, cam, nearZ); }
+    nodes.push(nd);
   }
-  items.sort((a, b) => a.d - b.d);
+  const items = [], G = { A, cam, P };
+  for (const u of orderGroup(nest(nodes), G)) emitUnit(u, items, G);
   ctx.lineJoin = 'round';
-  for (const it of items) {
-    const { o, f, pv, wet } = it, sel = o.id === S.sel;
-    ctx.beginPath();
-    f.i.forEach((vi, k) => k ? ctx.lineTo(pv[vi][0], pv[vi][1]) : ctx.moveTo(pv[vi][0], pv[vi][1]));
-    ctx.closePath();
-    if (wet) {                                         // вода: полупрозрачная, поверхность чуть плотнее
-      ctx.globalAlpha = f.top ? 0.6 : 0.45;
-      ctx.fillStyle = shadeCol(WATER, it.lit); ctx.fill();
-      ctx.globalAlpha = 0.9; ctx.strokeStyle = '#1F6FC2'; ctx.lineWidth = f.top ? 1.5 : 0.8;
-    } else {
-      const a = o._liq ? Math.min(S.alpha, 0.28) : S.alpha;   // с водой объект становится «стеклянным»
-      ctx.globalAlpha = a;
-      ctx.fillStyle = shadeCol(o.rgb, it.lit); ctx.fill();
-      if (a > 0.97) { ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = 0.6; ctx.stroke(); } // убираем щели между гранями
-      if (S.lit && o.type === 'box') literGrid(o, f, P, a);
-      // рёбра
-      ctx.globalAlpha = Math.min(1, a + (o._liq ? 0.55 : 0.35));
-      ctx.strokeStyle = sel ? '#2783DE' : shadeCol(o.rgb, 0.45);
-      ctx.lineWidth = sel ? 2 : 1.2;
-    }
-    ctx.beginPath();
-    for (let k = 0; k < f.i.length; k++) {
-      if (f.e && !f.e[k]) continue;
-      const a = pv[f.i[k]], b = pv[f.i[(k + 1) % f.i.length]];
-      ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]);
-    }
-    ctx.stroke();
-  }
+  for (const it of items) drawFace(it, P);
   ctx.globalAlpha = 1;
 
+  if (S.printing) { if (S.labels) drawLabels(); return; }
   const so = selObj();
   if (S.dims && so) drawDims(so, P);
-  if (S.labels) for (const o of S.objs) drawLabel(o);
+  if (S.labels) drawLabels();
   if (S.mode === 'draw') drawSketch();
   if (S.measure) drawMeasure();
   if (S.grid && !S.persp) drawRulers();
   updateHud();
 }
+/* ---------- Порядок граней (улучшенный «алгоритм художника») ----------
+   Каждое тело делится на задние и передние (к камере) грани. Тело рисуется так:
+   задние грани → то, что внутри (вода, вложенные предметы) → передние грани.
+   Для выпуклых тел это точно, поэтому вложенные и полупрозрачные объекты не «мерцают».
+   Разные тела упорядочиваются по разделяющей плоскости их габаритов: ближнее к камере — позже.
+   Пересекающиеся тела рисуются вместе с общей сортировкой граней. */
+const TOL = 0.5;                                        // допуск касания, мм
+function inPoly(pts, x, z) {
+  let c = false;
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const [xi, zi] = pts[i], [xj, zj] = pts[j];
+    if ((zi > z) !== (zj > z) && x < (xj - xi) * (z - zi) / (zj - zi) + xi) c = !c;
+  }
+  return c;
+}
+/* Наружные нормали граней в координатах объекта (кешируются в сетке) */
+function faceNormals(m) {
+  if (m.n) return m.n;
+  const b = bbox(m.v), c0 = [(b[0] + b[3]) / 2, (b[1] + b[4]) / 2, (b[2] + b[5]) / 2];
+  const eps = 1e-3 * Math.max(b[3] - b[0], b[5] - b[2], 1);
+  m.n = m.f.map(f => {
+    const idx = f.i, k = idx.length; let nx = 0, ny = 0, nz = 0, cx = 0, cy = 0, cz = 0;
+    for (let a = 0; a < k; a++) {                       // нормаль методом Ньюэлла
+      const p = m.v[idx[a]], q = m.v[idx[(a + 1) % k]];
+      nx += (p[1] - q[1]) * (p[2] + q[2]); ny += (p[2] - q[2]) * (p[0] + q[0]); nz += (p[0] - q[0]) * (p[1] + q[1]);
+      cx += p[0] / k; cy += p[1] / k; cz += p[2] / k;
+    }
+    const l = Math.hypot(nx, ny, nz) || 1; nx /= l; ny /= l; nz /= l;
+    let out;
+    if (m.poly && Math.abs(ny) < 0.5) out = !inPoly(m.poly, cx + nx * eps, cz + nz * eps);   // бок чертежа (может быть вогнутым)
+    else { const r = f.c || c0; out = nx * (cx - r[0]) + ny * (cy - r[1]) + nz * (cz - r[2]) >= 0; }
+    return out ? [nx, ny, nz, cx, cy, cz] : [-nx, -ny, -nz, cx, cy, cz];
+  });
+  return m.n;
+}
+const L_DIR = [-0.35, 0.75, 0.55], L_LEN = Math.hypot(...L_DIR);
+function mkNode(o, m, wv, pv, wet, A, cam, nearZ) {
+  const N = faceNormals(m), c = Math.cos(o.rot), s = Math.sin(o.rot);
+  const dx = o.px + (o.ox || 0), dy = o.oy || 0, dz = o.pz + (o.oz || 0), dot = (u, v) => u[0] * v[0] + u[1] * v[1] + u[2] * v[2];
+  const nd = { o, wet, back: [], front: [], kids: [], box: bbox(wv), sb: [Infinity, Infinity, -Infinity, -Infinity] };
+  for (const p of pv) { if (p[0] < nd.sb[0]) nd.sb[0] = p[0]; if (p[1] < nd.sb[1]) nd.sb[1] = p[1]; if (p[0] > nd.sb[2]) nd.sb[2] = p[0]; if (p[1] > nd.sb[3]) nd.sb[3] = p[1]; }
+  m.f.forEach((f, fi) => {
+    const idx = f.i;
+    if (S.persp && idx.some(i => pv[i][2] > nearZ)) return;   // грань за камерой — не рисуем
+    const [nx, ny, nz, cx, cy, cz] = N[fi], wn = [c * nx + s * nz, ny, -s * nx + c * nz];
+    const front = S.persp ? dot(wn, [cam[0] - (c * cx + s * cz + dx), cam[1] - (cy + dy), cam[2] - (-s * cx + c * cz + dz)]) > 1e-9
+                          : dot(wn, A.b) > 1e-9;
+    const vn = [dot(wn, A.r), dot(wn, A.u), dot(wn, A.b)];
+    const lit = 0.58 + 0.42 * Math.abs(dot(vn, L_DIR) / L_LEN);
+    let d = 0; for (const i of idx) d += pv[i][2];
+    (front ? nd.front : nd.back).push({ o, f, d: d / idx.length, lit, pv, wet });
+  });
+  return nd;
+}
+/* Перевод мировой точки в координаты объекта */
+function toLocal(o, p) {
+  const c = Math.cos(o.rot), s = Math.sin(o.rot), X = p[0] - o.px - (o.ox || 0), Y = p[1] - (o.oy || 0), Z = p[2] - o.pz - (o.oz || 0);
+  return [c * X - s * Z, Y, s * X + c * Z];
+}
+/* Лежит ли габарит box (мировые координаты) внутри формы объекта o */
+function insideShape(o, box) {
+  if (o.type === 'person') return false;
+  const hl = o.l / 2 + TOL, hw = o.w / 2 + TOL, H = o.h;
+  for (const xi of [0, 3]) for (const yi of [1, 4]) for (const zi of [2, 5]) {
+    const [x, y, z] = toLocal(o, [box[xi], box[yi], box[zi]]);
+    if (y < -TOL || y > H + TOL) return false;
+    const u = x / hl, v = z / hw, q = Math.max(0, 1 - y / H) + TOL / Math.min(hl, hw, H);
+    switch (o.type) {
+      case 'cyl': if (u * u + v * v > 1) return false; break;
+      case 'cone': if (Math.hypot(u, v) > q) return false; break;
+      case 'pyr': if (Math.max(Math.abs(u), Math.abs(v)) > q) return false; break;
+      case 'sph': { const t = (y - H / 2) / (H / 2 + TOL); if (u * u + v * v + t * t > 1) return false; break; }
+      case 'ext': if (!inPoly(o.pts, x, z) && !o.pts.some((p, i) => segDist(p, o.pts[(i + 1) % o.pts.length], x, z) < TOL)) return false; break;
+      default: if (Math.abs(u) > 1 || Math.abs(v) > 1) return false;
+    }
+  }
+  return true;
+}
+function segDist(a, b, x, z) {
+  const ux = b[0] - a[0], uz = b[1] - a[1], L2 = ux * ux + uz * uz || 1;
+  const t = Math.max(0, Math.min(1, ((x - a[0]) * ux + (z - a[1]) * uz) / L2));
+  return Math.hypot(a[0] + ux * t - x, a[1] + uz * t - z);
+}
+/* Вложенность: предмет внутри другого (коробка в коробке, карта в ящике) — рисуется между его гранями */
+function nest(nodes) {
+  const vol = b => (b[3] - b[0]) * (b[4] - b[1]) * (b[5] - b[2]);
+  const boxIn = (a, b) => [0, 1, 2].every(k => a[k] >= b[k] - TOL && a[k + 3] <= b[k + 3] + TOL);
+  for (const n of nodes) {
+    let best = null;
+    for (const m of nodes) if (m !== n && vol(m.box) > vol(n.box) * 1.0001 && boxIn(n.box, m.box)
+      && (!best || vol(m.box) < vol(best.box)) && insideShape(m.o, n.box)) best = m;
+    n.par = best; n.o._par = best ? best.o : null;
+  }
+  for (const n of nodes) if (n.par) n.par.kids.push(n);
+  for (const n of nodes) { if (n.liq) n.kids.push(n.liq); n.o._glass = n.kids.length > 0; }   // контейнер — «стеклянный»
+  return nodes.filter(n => !n.par);
+}
+/* Взаимный порядок двух тел: −1 — a рисовать раньше b, 1 — позже, 0 — всё равно, null — пересекаются */
+function sepRel(a, b, G) {
+  let best = null, g = -TOL;
+  for (let k = 0; k < 3; k++) {
+    const g1 = b.box[k] - a.box[k + 3], g2 = a.box[k] - b.box[k + 3];
+    if (g1 >= g) { g = g1; best = [k, (a.box[k + 3] + b.box[k]) / 2, 1]; }    // b — с «плюсовой» стороны
+    if (g2 >= g) { g = g2; best = [k, (b.box[k + 3] + a.box[k]) / 2, -1]; }
+  }
+  if (!best) return null;
+  const [k, s, side] = best, cs = S.persp ? G.cam[k] - s : G.A.b[k];
+  if (Math.abs(cs) < 1e-9) return 0;
+  return (cs > 0) === (side > 0) ? -1 : 1;                                    // ближнее к камере — позже
+}
+const sbOver = (a, b) => a[0] < b[2] && b[0] < a[2] && a[1] < b[3] && b[1] < a[3];
+function orderGroup(list, G) {
+  const n = list.length; if (n < 2) return list.map(x => [x]);
+  const par = range(n), find = i => par[i] === i ? i : (par[i] = find(par[i]));
+  const rel = list.map(() => new Array(n).fill(0));
+  for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
+    const r = sepRel(list[i], list[j], G);
+    if (r === null) { par[find(i)] = find(j); continue; }                      // пересекаются — в один кластер
+    if (r && sbOver(list[i].sb, list[j].sb)) { rel[i][j] = r; rel[j][i] = -r; }
+  }
+  let E = new Set();
+  for (let guard = 0; guard <= n; guard++) {          // противоречащие друг другу кластеры сливаем
+    E = new Set(); let merged = false;
+    for (let i = 0; i < n && !merged; i++) for (let j = 0; j < n; j++) {
+      if (rel[i][j] >= 0) continue;                     // «i раньше j»
+      const a = find(i), b = find(j); if (a === b) continue;
+      if (E.has(b + '>' + a)) { par[a] = b; merged = true; break; }
+      E.add(a + '>' + b);
+    }
+    if (!merged) break;
+  }
+  const cl = new Map(); list.forEach((x, i) => { const r = find(i); if (!cl.has(r)) cl.set(r, []); cl.get(r).push(x); });
+  const indeg = new Map([...cl.keys()].map(r => [r, 0])), out = new Map([...cl.keys()].map(r => [r, []]));
+  for (const e of E) { const [a, b] = e.split('>').map(Number); if (cl.has(a) && cl.has(b) && a !== b) { out.get(a).push(b); indeg.set(b, indeg.get(b) + 1); } }
+  const depth = r => Math.min(...cl.get(r).map(x => G.P.view([(x.box[0] + x.box[3]) / 2, (x.box[1] + x.box[4]) / 2, (x.box[2] + x.box[5]) / 2])[2]));
+  const res = [], left = new Set(cl.keys());
+  while (left.size) {
+    let pick = null, pd = Infinity;
+    for (const r of left) if (indeg.get(r) <= 0) { const d = depth(r); if (d < pd) { pd = d; pick = r; } }
+    if (pick === null) for (const r of left) { const d = depth(r); if (d < pd) { pd = d; pick = r; } }   // цикл — рвём по дальнему
+    left.delete(pick); res.push(cl.get(pick));
+    for (const b of out.get(pick)) indeg.set(b, indeg.get(b) - 1);
+  }
+  return res;
+}
+const byD = (a, b) => a.d - b.d;
+function emitUnit(u, out, G) {
+  out.push(...u.flatMap(x => x.back).sort(byD));
+  for (const k of orderGroup(u.flatMap(x => x.kids), G)) emitUnit(k, out, G);
+  out.push(...u.flatMap(x => x.front).sort(byD));
+}
+function drawFace(it, P) {
+  const { o, f, pv, wet } = it, sel = o.id === S.sel && !S.printing;
+  ctx.beginPath();
+  f.i.forEach((vi, k) => k ? ctx.lineTo(pv[vi][0], pv[vi][1]) : ctx.moveTo(pv[vi][0], pv[vi][1]));
+  ctx.closePath();
+  if (wet) {                                         // вода: полупрозрачная, поверхность чуть плотнее
+    ctx.globalAlpha = f.top ? 0.6 : 0.45;
+    ctx.fillStyle = shadeCol(WATER, it.lit); ctx.fill();
+    ctx.globalAlpha = 0.9; ctx.strokeStyle = '#1F6FC2'; ctx.lineWidth = f.top ? 1.5 : 0.8;
+  } else {
+    const a = o._glass ? Math.min(S.alpha, 0.28) : S.alpha;   // с водой или предметом внутри — «стекло»
+    ctx.globalAlpha = a;
+    ctx.fillStyle = shadeCol(o.rgb, it.lit); ctx.fill();
+    if (a > 0.97) { ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = 0.6; ctx.stroke(); } // убираем щели между гранями
+    if (S.lit && o.type === 'box') literGrid(o, f, P, a);
+    ctx.globalAlpha = Math.min(1, a + (o._glass ? 0.55 : 0.35));
+    ctx.strokeStyle = sel ? '#2783DE' : shadeCol(o.rgb, 0.45);
+    ctx.lineWidth = sel ? 2 : 1.2;
+  }
+  ctx.beginPath();
+  for (let k = 0; k < f.i.length; k++) {
+    if (f.e && !f.e[k]) continue;
+    const a = pv[f.i[k]], b = pv[f.i[(k + 1) % f.i.length]];
+    ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]);
+  }
+  ctx.stroke();
+}
 
 /* «Литровые кубики»: линии через 10 см на гранях коробки (кубик 10×10×10 см = 1 л).
    Линии считаются в координатах самого объекта от его угла, поэтому на соседних гранях совпадают. */
 function literGrid(o, f, P, alpha) {
-  if (100 * pxmm() * S.zoom < 5 || Math.max(o.l, o.w, o.h) > 20000) return;   // слишком мелко или огромно
+  if (100 * scaleK() < 5 || Math.max(o.l, o.w, o.h) > 20000) return;   // слишком мелко или огромно
   const v = f.i.map(i => o.mesh.v[i]), ax = [0, 1, 2];
   const mn = ax.map(k => Math.min(...v.map(p => p[k]))), mx = ax.map(k => Math.max(...v.map(p => p[k])));
   const flat = ax.find(k => mx[k] - mn[k] < 1e-6); if (flat === undefined) return;
@@ -700,7 +976,7 @@ function literGrid(o, f, P, alpha) {
 }
 /* Сетка 1:1 — миллиметры, сантиметры, 5 и 10 см */
 function drawGrid() {
-  const k = pxmm() * S.zoom, [ox, oy] = origin(), { W, H } = S;
+  const k = scaleK(), [ox, oy] = origin(), { W, H } = S;
   const lines = (mm, color, lw) => {
     const s = mm * k; if (s < 5) return;
     ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = lw;
@@ -729,7 +1005,7 @@ function drawFloor(P) {
 }
 /* Линейки сверху и слева (в сантиметрах, ноль — в центре сцены) */
 function drawRulers() {
-  const k = pxmm() * S.zoom, [ox, oy] = origin(), { W, H } = S, R = 22;
+  const k = scaleK(), [ox, oy] = origin(), { W, H } = S, R = 22;
   ctx.fillStyle = 'rgba(255,255,255,.95)'; ctx.fillRect(0, 0, W, R); ctx.fillRect(0, 0, R, H);
   ctx.strokeStyle = '#7D7A75'; ctx.fillStyle = '#7D7A75'; ctx.lineWidth = 1; ctx.font = '10px system-ui,sans-serif';
   const labelEvery = k * 10 >= 22 ? 1 : k * 10 >= 9 ? 5 : 10;
@@ -750,7 +1026,7 @@ function drawRulers() {
 }
 function drawBg() {
   const b = S.bg; if (!b.img) return;
-  const k = pxmm() * S.zoom, [ox, oy] = origin(), w = b.img.width * b.mpp * k, h = b.img.height * b.mpp * k;
+  const k = scaleK(), [ox, oy] = origin(), w = b.img.width * b.mpp * k, h = b.img.height * b.mpp * k;
   ctx.globalAlpha = b.op; ctx.drawImage(b.img, ox + b.x * k - w / 2, oy + b.y * k - h / 2, w, h); ctx.globalAlpha = 1;
 }
 function tag(text, x, y, color, bg) {
@@ -761,11 +1037,39 @@ function tag(text, x, y, color, bg) {
   ctx.fillStyle = color || '#2C2C2B'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, x, y + 0.5);
   ctx.textAlign = 'start'; ctx.textBaseline = 'alphabetic';
 }
-function drawLabel(o) {
-  const pv = o._pv; let minY = Infinity, minX = Infinity, maxX = -Infinity;
-  for (const p of pv) { if (p[1] < minY) minY = p[1]; if (p[0] < minX) minX = p[0]; if (p[0] > maxX) maxX = p[0]; }
-  const vol = S.vol ? '  ·  ' + fmtVol(volumeMm3(o)) + (o._liq ? '  ·  💧 ' + fmtVol(o._liq.V) : '') : '';
-  tag(`${o.name}  ${fmt3(o)}${vol}`, (minX + maxX) / 2, minY - 16, o.id === S.sel ? '#2783DE' : '#2C2C2B');
+const labelText = o => `${o.name}  ${fmt3(o)}` + (S.vol && o.type !== 'person'
+  ? '  ·  ' + fmtVol(volumeMm3(o)) + (o._liq ? '  ·  💧 ' + fmtVol(o._liq.V) : '') : '');
+/* Подписи над объектами; если налезают друг на друга — поднимаем выше и ведём линию-выноску */
+function drawLabels() {
+  ctx.font = '600 12px system-ui,sans-serif';
+  const L = [];
+  for (const o of S.objs) {
+    const pv = o._pv; if (!pv || !pv.length) continue;
+    let minY = Infinity, minX = Infinity, maxX = -Infinity;
+    for (const p of pv) { if (p[1] < minY) minY = p[1]; if (p[0] < minX) minX = p[0]; if (p[0] > maxX) maxX = p[0]; }
+    if (!isFinite(minY)) continue;
+    const text = labelText(o), w = ctx.measureText(text).width + 10;
+    let x = (minX + maxX) / 2;
+    if (!S.printing) x = Math.max(w / 2 + 26, Math.min(S.W - w / 2 - 4, x));
+    L.push({ o, text, w, x, ay: minY, y: minY - 16 });
+  }
+  L.sort((a, b) => b.y - a.y);                        // снизу вверх
+  const placed = [];
+  for (const l of L) {
+    for (let g = 0; g < 80; g++) {
+      const hit = placed.find(p => Math.abs(p.x - l.x) < (p.w + l.w) / 2 + 4 && Math.abs(p.y - l.y) < 22);
+      if (!hit) break; l.y = hit.y - 22;
+    }
+    placed.push(l);
+  }
+  for (const l of placed) {
+    const col = l.o.id === S.sel && !S.printing ? '#2783DE' : '#2C2C2B';
+    if (l.ay - l.y > 30) {
+      ctx.save(); ctx.strokeStyle = col; ctx.globalAlpha = 0.5; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+      ctx.beginPath(); ctx.moveTo(l.x, l.y + 10); ctx.lineTo(l.x, l.ay - 2); ctx.stroke(); ctx.restore();
+    }
+    tag(l.text, l.x, l.y, col);
+  }
 }
 /* Размерные линии на выбранном объекте: длина, ширина, высота */
 function drawDims(o, P) {
@@ -779,7 +1083,7 @@ function drawDims(o, P) {
 }
 /* Черчение контура */
 function drawSketch() {
-  const k = pxmm() * S.zoom, [ox, oy] = origin(), D = S.draw;
+  const k = scaleK(), [ox, oy] = origin(), D = S.draw;
   const scr = p => [ox + p[0] * k, oy + p[1] * k];
   const pts = D.pts.map(scr), hv = D.hover && scr(D.hover);
   ctx.strokeStyle = '#2783DE'; ctx.lineWidth = 2; ctx.fillStyle = 'rgba(39,131,222,.12)';
@@ -808,9 +1112,19 @@ function drawMeasure() {
 function updateHud() {
   const h = [];
   if (screenInfo().src === 'none') h.push('<div class="warn">⚠ Размер экрана не определён — нажмите «Калибровка»</div>');
+  const vv = window.visualViewport, w = win();
+  if (vv && vv.scale > 1.02) h.push('<div class="warn">Страница увеличена жестом — сведите пальцы, чтобы вернуть 100 %</div>');
+  else if (IS_SAFARI && !IS_IOS && w.innerWidth > 0 && Math.abs(w.outerWidth / w.innerWidth - 1) > 0.08) h.push('<div class="warn">Похоже, в Safari изменён масштаб страницы — нажмите ⌘0</div>');
+  else if (IS_IPHONE && Math.abs(w.innerWidth / (matchMedia('(orientation: landscape)').matches ? Math.max : Math.min)(screen.width, screen.height) - 1) > 0.05) h.push('<div class="warn">Масштаб страницы в Safari не 100 % — «аА» → 100 %</div>');
   if (S.fly) h.push(`<div>✈ Полёт · скорость ${Math.round(S.flySpeed / 10)} см/с</div>`);
   else if (Math.abs(S.zoom - 1) < 1e-3) h.push('<div>Масштаб 1:1 ✓</div>');
-  else h.push(`<div class="warn">Зум ×${S.zoom.toFixed(2)} — не 1:1 (R — сброс)</div>`);
+  else {
+    const rk = matchMedia('(pointer: coarse)').matches ? 'кнопка 1:1' : 'R';
+    const z = S.zoom < 1 ? 1 / S.zoom : S.zoom, n = z < 10 ? Math.round(z * 10) / 10 : Math.round(z), p = Math.round(S.zoom * 1000) / 10;
+    const t = z < 2 ? `Масштаб ${String(Math.abs(p - 100) < 1 ? p : Math.round(p)).replace('.', ',')} %`
+      : `${S.zoom < 1 ? 'Уменьшено' : 'Увеличено'} в ${String(n).replace('.', ',')} ${Number.isInteger(n) ? plural(n, 'раз', 'раза', 'раз') : 'раза'}`;
+    h.push(`<div class="warn">${t} — не 1:1 (${rk} — сброс)</div>`);
+  }
   h.push(S.persp ? '<div class="warn">Перспектива искажает размеры</div>' : '<div>Ортографическая камера</div>');
   $('#hud').innerHTML = h.join('');
   $('#tip').textContent = S.fly ? 'Полёт: W/A/S/D — лететь · E/Пробел — вверх · Q — вниз · Shift — быстрее · мышь — осмотреться · колесо — скорость · F или Esc — выход'
@@ -824,12 +1138,204 @@ function updateHud() {
 /* =====================================================================
    5. ЕДИНИЦЫ ИЗМЕРЕНИЯ
    ===================================================================== */
-const unit = () => $('#fUnit').value;
-const toMm = v => unit() === 'cm' ? v * 10 : v;
-const fromMm = v => unit() === 'cm' ? v / 10 : v;
-const num = v => (+v.toFixed(unit() === 'cm' ? 2 : 1)).toLocaleString('ru-RU');
-const fmt = mm => num(fromMm(mm)) + (unit() === 'cm' ? ' см' : ' мм');
-const fmt3 = o => `${num(fromMm(o.l))}×${num(fromMm(o.w))}×${num(fromMm(o.h))} ${unit() === 'cm' ? 'см' : 'мм'}`;
+const UNITS = { mm: 1, cm: 10, in: 25.4 }, UNAME = { mm: 'мм', cm: 'см', in: 'дюймы' };
+const unit = () => UNITS[$('#fUnit').value] ? $('#fUnit').value : 'cm';
+const toMm = v => v * UNITS[unit()];
+const fromMm = v => v / UNITS[unit()];
+const num = v => (+v.toFixed(unit() === 'mm' ? 1 : 2)).toLocaleString('ru-RU');
+const usfx = () => unit() === 'in' ? '″' : ' ' + UNAME[unit()];
+const fmt = mm => num(fromMm(mm)) + usfx();
+const fmt3 = o => `${num(fromMm(o.l))}×${num(fromMm(o.w))}×${num(fromMm(o.h))}${usfx()}`;
+/* Всплывающее сообщение внизу экрана */
+let toastT = 0;
+function toast(text, ms = 3600) { const el = $('#toast'); el.textContent = text; el.classList.add('on'); clearTimeout(toastT); toastT = setTimeout(() => el.classList.remove('on'), ms); }
+const plural = (n, a, b, c) => { const m = n % 10, h = n % 100; return m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 12 || h > 14) ? b : c; };
+
+/* =====================================================================
+   5в. РАЗМЕРЫ ИЗ ТЕКСТА
+   Понимает «60×40×85 см», «Габариты (Ш×Г×В): 60×55×85 см», «Ш 45 × Г 60 × В 85», «Длина: 120 см, ширина 60 см…»,
+   «Диаметр 30 см, высота 15 см», «Ø26×15 см», «23.6 x 15.7 x 33.5 inches», «12" x 8" x 4"», «Объём 5 л».
+   ===================================================================== */
+const DIM_UNIT = { 'мм': 1, 'mm': 1, 'см': 10, 'cm': 10, 'дм': 100, 'dm': 100, 'м': 1000, 'm': 1000,
+  'in': 25.4, 'inch': 25.4, 'inches': 25.4, 'дюйм': 25.4, 'дюйма': 25.4, 'дюймов': 25.4, '"': 25.4, '″': 25.4, '”': 25.4,
+  'ft': 304.8, 'feet': 304.8, 'foot': 304.8, 'фут': 304.8, 'фута': 304.8, 'футов': 304.8 };
+const ROLE_OF = { 'д': 'L', 'l': 'L', 'ш': 'W', 'w': 'W', 'в': 'H', 'h': 'H', 'г': 'D', 'd': 'D', 'т': 'D', 't': 'D', 'ø': 'O', '⌀': 'O' };
+const LABELS = [[/^(длин|length|long)/, 'L'], [/^(ширин|width|wide)/, 'W'], [/^(высот|рост|height|high|tall)/, 'H'],
+  [/^(глубин|толщин|depth|deep|thick)/, 'D'], [/^(диаметр|diameter|dia$)/, 'O']];
+function dimTokens(text) {
+  const out = [], re = /(\d+(?:[.,]\d+)?)|([a-zа-яё]+)|(\n)|([ \t\u00a0]+)|(.)/giu;
+  let m;
+  while ((m = re.exec(text))) {
+    const s = m[0], at = m.index;
+    if (m[1]) out.push({ k: 'num', v: parseFloat(s.replace(',', '.')), s, at });
+    else if (m[2]) {
+      const low = s.toLowerCase(), um = low.match(/^(мм|mm|см|cm|дм|dm|м|m|in|ft)([xх])$/);
+      if (um) { out.push({ k: 'unit', u: um[1], s, at }); out.push({ k: 'sep', s: 'x', at: at + um[1].length }); }
+      else if (low === 'x' || low === 'х' || low === 'на' || low === 'by') out.push({ k: 'sep', s, at, word: low.length > 1 });
+      else if (DIM_UNIT[low]) out.push({ k: 'unit', u: low, s, at });
+      else out.push({ k: 'word', s, low, at });
+    }
+    else if (m[3]) out.push({ k: 'nl', s, at });
+    else if (m[4]) continue;
+    else if ('×✕✖*'.includes(s)) out.push({ k: 'sep', s, at });
+    else if ('"″”'.includes(s)) out.push({ k: 'unit', u: s, s, at, q: true });
+    else out.push({ k: 'p', s, at });
+  }
+  return out;
+}
+function parseDims(text) {
+  text = String(text || '').slice(0, 20000);
+  const T = dimTokens(text), n = T.length;
+  const isRole = t => t && (t.k === 'word' && t.s.length === 1 && ROLE_OF[t.low]) || (t && t.k === 'p' && ROLE_OF[t.s.toLowerCase()]);
+  const roleOf = t => ROLE_OF[(t.low || t.s).toLowerCase()];
+  // число с необязательной буквой-ролью перед ним и единицами после
+  const numAt = i => {
+    let j = i, role = null;
+    if (isRole(T[j]) && T[j + 1]) { const r = roleOf(T[j]); let k = j + 1; if (T[k].k === 'p' && ':.='.includes(T[k].s)) k++; if (T[k] && T[k].k === 'num') { role = r; j = k; } }
+    if (!T[j] || T[j].k !== 'num') return null;
+    const t = T[j]; let u = null, end = j + 1;
+    if (T[end] && T[end].k === 'unit') { u = T[end].u; end++; }
+    if (!role && isRole(T[end]) && (!T[end + 1] || T[end + 1].k === 'sep' || T[end + 1].k === 'nl' || T[end + 1].k === 'p')) { role = roleOf(T[end]); end++; }   // «10.5" W»
+    return { v: t.v, role, u, start: i, ni: j, end, at: T[i].at };
+  };
+  const chains = [];
+  for (let i = 0; i < n; i++) {
+    const a = numAt(i); if (!a) continue;
+    if (T[a.start].k === 'num' && i > 0 && T[i - 1].k === 'sep') continue;
+    const nums = [a]; let j = a.end;
+    while (nums.length < 3 && T[j] && T[j].k === 'sep') { const b = numAt(j + 1); if (!b) break; nums.push(b); j = b.end; }
+    if (nums.length < 2) continue;
+    chains.push({ nums, start: i, end: j }); i = j - 1;
+  }
+  const lineStart = i => { while (i > 0 && T[i - 1].k !== 'nl') i--; return i; };
+  const back = (i, k) => T.slice(Math.max(lineStart(i), i - k), i);
+  const ahead = (i, k) => { const r = []; for (let j = i; j < n && j < i + k && T[j].k !== 'nl'; j++) r.push(T[j]); return r; };
+  const unitBefore = i => { const b = back(i, 10).filter(t => t.k === 'unit' && !t.q); return b.length ? b[b.length - 1].u : null; };
+  const isPack = i => back(i, 14).some(t => t.k === 'word' && (/^(упаков|packag|shipping|carton)/.test(t.low) || /^коробк(и|е|ой|ою)$/.test(t.low)));   // «размер коробки», но не «Коробка 20×10×5»
+  // код порядка рядом с числами: «ДхШхВ», «Ш×Г×В», «L x W x H» — перед ними или сразу после
+  const codeIn = (b, len) => {
+    for (let k = b.length - 1; k >= 0; k--) {
+      const t = b[k];
+      if (t.k === 'word' && t.s.length >= 3) { const m = t.low.match(/^([дшвгтlwhd])[xх]([дшвгтlwhd])(?:[xх]([дшвгтlwhd]))?$/); if (m) { const r = m.slice(1).filter(Boolean).map(c => ROLE_OF[c]); if (r.length === len) return r; } }
+      if (isRole(t)) {                                // одиночные буквы через разделитель
+        const r = [roleOf(t)]; let q = k + 1;
+        while (b[q] && (b[q].k === 'sep' || (b[q].k === 'p' && '/'.includes(b[q].s))) && isRole(b[q + 1])) { r.push(roleOf(b[q + 1])); q += 2; }
+        if (r.length >= 2 && r.length === len) return r;
+      }
+    }
+    return null;
+  };
+  const cands = [];
+  for (const c of chains) {
+    const af = ahead(c.end, 3);
+    if (af.some(t => t.k === 'word' && /^(px|пикс|шт|pcs|раз|пт)/.test(t.low)) || back(c.start, 6).some(t => t.k === 'word' && /^(разрешени|resolution|пиксел|pixel)/.test(t.low))) continue;
+    const nums = c.nums;
+    let u = null; for (let k = nums.length - 1; k >= 0; k--) { if (nums[k].u) u = nums[k].u; else nums[k].u2 = u; }
+    let unitSrc = 'inline';
+    if (!nums.some(x => x.u)) {
+      const nx = af.find(t => t.k === 'unit'); const ub = unitBefore(c.start);
+      const uu = nx ? nx.u : ub; nums.forEach(x => x.u2 = uu); if (!uu) unitSrc = 'none';
+    }
+    let roles = nums.every(x => x.role) ? nums.map(x => x.role) : null, st = c.start;
+    if (!roles) {
+      if (nums[0].role === 'O' && nums.length === 2 && !nums[1].role) roles = ['O', 'H'];                 // «Ø26×15 см»
+      else { st = nums[0].ni; roles = codeIn(back(st, 14), nums.length) || codeIn(ahead(c.end, 8), nums.length); }
+    }
+    cands.push({ nums, roles, unitSrc, pack: isPack(st), at: T[st].at, end: T[c.end - 1].at + T[c.end - 1].s.length, tok: st });
+  }
+  // подписанные значения: «Высота (см): 85», «ширина 60 см», «Ø 26 см»
+  const lab = {}; let labAt = null, labTok = null, labUnits = 0, labNone = 0;
+  for (let i = 0; i < n; i++) {
+    const t = T[i]; let role = null;
+    if (t.k === 'word') { for (const [re, r] of LABELS) if (re.test(t.low)) { role = r; break; } }
+    else if (t.k === 'p' && (t.s === 'Ø' || t.s === 'ø' || t.s === '⌀')) role = 'O';
+    if (!role || lab[role]) continue;
+    let j = i + 1, u = null, steps = 0;
+    while (T[j] && steps < 7 && T[j].k !== 'num' && T[j].k !== 'nl') {
+      if (T[j].k === 'unit' && !T[j].q) u = T[j].u;
+      else if (T[j].k === 'word' && !/^(около|примерно|до|всего|max|макс|изделия|товара|в|сборе|упаковки|общая|наружная|внутренняя|см|мм|mm|cm)$/.test(T[j].low)) break;
+      j++; steps++;
+    }
+    if (!T[j] || T[j].k !== 'num') continue;
+    if (T[j + 1] && T[j + 1].k === 'unit') u = T[j + 1].u;
+    lab[role] = { v: T[j].v, u }; if (labAt === null) { labAt = t.at; labTok = i; }
+    if (u) labUnits++; else labNone++;
+  }
+  const labKeys = Object.keys(lab);
+  if (labKeys.length >= 2 || lab.O) {
+    let lu = null; for (const k of labKeys) if (lab[k].u) lu = lab[k].u;
+    labKeys.forEach(k => { if (!lab[k].u) lab[k].u2 = lu || unitBefore(labTok); });
+    cands.push({ lab, labeled: true, unitSrc: labKeys.every(k => lab[k].u || lab[k].u2) ? 'inline' : 'none', pack: isPack(labTok), at: labAt, tok: labTok });
+  }
+  // объём
+  const vm = text.match(/(\d+(?:[.,]\d+)?)\s*(мл|ml|литр[а-я]*|liters?|litres?|л|l|м³|м3|m³|m3|куб\.?\s*м)(?![a-zа-яё0-9])/i);
+  const best = cands.find(c => !c.pack) || cands[0];
+  const nameFrom = c => {
+    const pick = s => { s = s.replace(/[\(\[][^)\]]*[\)\]]/g, ' ').replace(/(размеры?|габариты?|габаритные|упаковк[а-я]*|в упаковке|в коробке|коробк(?:и|ой|ою)|товара|изделия|в сборе|dimensions?|size|ш\s*[×xх*]\s*г\s*[×xх*]\s*в|д\s*[×xх*]\s*ш\s*[×xх*]\s*в|[дшвгlwhd]\s*[×xх*]\s*[дшвгlwhd]\s*[×xх*]\s*[дшвгlwhd]|[дшвгlwhd][xх][дшвгlwhd][xх][дшвгlwhd]|см|мм|cm|mm)(?![a-zа-яё])/giu, ' ')
+        .replace(/[:;,=•·\-–—|]+/g, ' ').replace(/\s+/g, ' ').trim();
+      return (s.match(/[a-zа-яё]/giu) || []).length >= 3 && s.length <= 80 ? s : null; };
+    const ls = c ? lineStart(c.tok) : 0, pre = c ? text.slice(T[ls] ? T[ls].at : 0, c.at) : '';
+    const first = text.split('\n').map(s => s.trim()).find(Boolean) || '';
+    return pick(pre) || (first && !first.includes(c ? text.slice(c.at, c.at + 4) : '\u0000') ? pick(first) : null);
+  };
+  if (!best) {
+    if (!vm) return null;
+    const k = /^(мл|ml)$/i.test(vm[2]) ? 1e3 : /^(м³|м3|m³|m3|куб)/i.test(vm[2]) ? 1e9 : 1e6;
+    return { vol: parseFloat(vm[1].replace(',', '.')) * k, name: nameFrom(null) };
+  }
+  // единицы: где не указаны — из формы; крупные числа без единиц в «см» скорее мм
+  const vals = best.labeled ? Object.values(best.lab) : best.nums;
+  let defU = unit(), note = '';
+  if (best.unitSrc === 'none') {
+    const mx = Math.max(...vals.map(x => x.v));
+    if (defU === 'cm' && mx >= 400) { defU = 'mm'; note = 'единицы не указаны — понял как мм'; }
+    else note = `единицы не указаны — понял как ${UNAME[defU]}`;
+  }
+  const mm = x => x.v * (DIM_UNIT[x.u || x.u2] || UNITS[defU]);
+  let R = {};
+  if (best.labeled) for (const k in best.lab) R[k] = mm(best.lab[k]);
+  else if (best.roles) best.nums.forEach((x, i) => { if (R[best.roles[i]] === undefined) R[best.roles[i]] = mm(x); });
+  else if (best.nums.length === 3) { const [a, b, c] = best.nums.map(mm); R = { L: a, W: b, H: c }; }
+  else { const [a, b] = best.nums.map(mm); R = { L: a, H: b }; }       // два размера — плоская вещь «лицом» к экрану
+  let type = 'box', l, w, h;
+  if (R.O) { type = 'cyl'; l = w = R.O; h = R.H ?? R.L ?? R.D ?? null;
+    if (h == null && /(мяч|шар|ball|sphere|глобус|сфер)/i.test(text)) { type = 'sph'; h = R.O; }
+    else if (h == null) { h = 2; note = (note ? note + '; ' : '') + 'высота не указана — 2 мм'; } }
+  else {
+    if (R.D != null && R.L != null && R.W != null && R.H == null) { l = R.L; w = R.W; h = R.D; }
+    else if (R.D != null) { l = R.W ?? R.L; w = R.D; h = R.H; }
+    else { l = R.L ?? R.W; w = R.L != null ? R.W : undefined; h = R.H; }
+    const known = [l, w, h].filter(v => v > 0).length;
+    if (known < 2) return vm ? { vol: parseFloat(vm[1].replace(',', '.')) * (/^(мл|ml)$/i.test(vm[2]) ? 1e3 : /^(м³|м3|m³|m3|куб)/i.test(vm[2]) ? 1e9 : 1e6), name: nameFrom(null) } : null;
+    if (!(h > 0)) { h = 2; note = (note ? note + '; ' : '') + 'толщина не указана — 2 мм'; }
+    else if (!(w > 0)) { w = 2; note = (note ? note + '; ' : '') + 'толщина не указана — 2 мм'; }
+    else if (!(l > 0)) { l = 2; note = (note ? note + '; ' : '') + 'один размер не указан — 2 мм'; }
+  }
+  if (![l, w, h].every(v => v > 0 && v < 1e6)) return null;
+  const nm = nameFrom(best), name = best.pack ? (nm ? nm + ' — упаковка' : 'Упаковка') : nm || 'Из текста';
+  return { type, l, w, h, name, note, pack: best.pack, src: best.labeled ? null : text.slice(best.at, best.end) };
+}
+
+/* Добавить объект по тексту. quiet — вызвано вставкой Ctrl+V (сообщение всплывает внизу) */
+function addFromText(text, quiet) {
+  const r = parseDims(text), out = $('#fTextOut');
+  if (!r) { if (!quiet) out.textContent = 'Размеров не нашлось. Пример: «60×40×85 см», «Ш×Г×В: 60×55×85», «Диаметр 30 см, высота 15 см».'; return false; }
+  let msg;
+  if (r.vol) {
+    const [v, u] = r.vol < 1e6 ? [r.vol / 1e3, 'ml'] : r.vol < 1e9 ? [r.vol / 1e6, 'l'] : [r.vol / 1e9, 'm3'];
+    $('#vVal').value = +v.toPrecision(6); $('#vUnit').value = u; updateVolUI(); $('#vAdd').click();
+    msg = `Добавлен объём ${fmtVol(r.vol)} (${$('#vMode').selectedOptions[0].textContent.toLowerCase()})`;
+  } else {
+    $('#fShape').value = r.type; $('#fShape').onchange(); $('#fName').value = r.name;
+    ['#fL', '#fW', '#fH'].forEach((s, i) => $(s).value = +fromMm([r.l, r.w, r.h][i]).toFixed(3));
+    const o = addObj({ type: r.type, name: r.name, l: r.l, w: r.w, h: r.h, color: $('#fColor').value });
+    $('#fColor').value = PALETTE[(S.nextId - 1) % PALETTE.length];
+    msg = `Добавлено: «${r.name}» — ${SHAPE[r.type].toLowerCase()} ${fmt3(o)}` + (r.note ? ` (${r.note})` : '');
+    const h = bigHint(o); if (h) { out.textContent = msg; toast(msg + '. ' + h.replace(/^«[^»]*» /, 'Объект '), 7000); return true; }
+  }
+  out.textContent = msg; if (quiet) toast(msg + ' · Ctrl+Z — отменить', 5000);
+  return true;
+}
 
 /* =====================================================================
    5б. ОБЪЁМ И ЛИТРЫ
@@ -838,7 +1344,7 @@ const fmt3 = o => `${num(fromMm(o.l))}×${num(fromMm(o.w))}×${num(fromMm(o.h))}
    prism — сечение постоянно (коробка, цилиндр, чертёж), apex — сужается к вершине (конус, пирамида),
    ell — эллипсоид (шар). Отсюда и объём до любой высоты — нужен, чтобы «налить воду».
    ===================================================================== */
-const SHAPE = { box: 'Коробка', cyl: 'Цилиндр', cone: 'Конус', pyr: 'Пирамида', sph: 'Шар', ext: 'Чертёж' };
+const SHAPE = { box: 'Коробка', cyl: 'Цилиндр', cone: 'Конус', pyr: 'Пирамида', sph: 'Шар', ext: 'Чертёж', person: 'Человек' };
 const WATER = [74, 158, 235];
 const polyArea = pts => { let a = 0; for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) a += (pts[j][0] + pts[i][0]) * (pts[j][1] - pts[i][1]); return Math.abs(a) / 2; };
 const kindOf = t => t === 'cone' || t === 'pyr' ? 'apex' : t === 'sph' ? 'ell' : 'prism';
@@ -854,7 +1360,10 @@ function volUpTo(kind, A, H, y) {                      // объём от дна
   if (kind === 'ell') { const b = H / 2; return A * (y - (Math.pow(y - b, 3) + b * b * b) / (3 * b * b)); }
   return A * y;
 }
-const volumeMm3 = o => volUpTo(kindOf(o.type), baseOf(o.type, o.l, o.w, o.pts), o.h, o.h);
+const volumeMm3 = o => o.type === 'person' ? o.l * o.w * o.h * 0.26     // ≈ 66 л при росте 175 см (≈ масса тела)
+  : volUpTo(kindOf(o.type), baseOf(o.type, o.l, o.w, o.pts), o.h, o.h);
+/* Толщина стенок объекта (для воды и проверки «Влезет ли?»), мм */
+const wallOf = o => Math.max(0, +(o.wall ?? (o.fill && o.fill.wall)) || 0);
 const sig = (v, n = 3) => { if (!isFinite(v) || v <= 0) return '0'; const d = Math.max(0, n - 1 - Math.floor(Math.log10(v))); return (+v.toFixed(Math.min(d, 6))).toLocaleString('ru-RU'); };
 const fmtVol = mm3 => { const l = mm3 / 1e6; return l < 0.9995 ? sig(l * 1000) + ' мл' : l < 999.5 ? sig(l) + ' л' : sig(l / 1000) + ' м³'; };
 const fmtKg = kg => kg < 0.9995 ? sig(kg * 1000) + ' г' : kg < 999.5 ? sig(kg) + ' кг' : sig(kg / 1000) + ' т';
@@ -897,7 +1406,7 @@ function updateVolUI() {
 /* ---------- Вода внутри объекта ----------
    Полость = наружная форма минус стенки t: по бокам −2t, дно t (у конуса/пирамиды/шара и сверху t). */
 function cavity(o) {
-  const t = Math.max(0, (o.fill && o.fill.wall) || 0), kind = kindOf(o.type);
+  const t = wallOf(o), kind = kindOf(o.type);
   const l = Math.max(0, o.l - 2 * t), w = Math.max(0, o.w - 2 * t), H = Math.max(0, o.h - (kind === 'prism' ? t : 2 * t));
   let poly;
   if (o.type === 'ext') { const sx = o.l ? l / o.l : 0, sz = o.w ? w / o.w : 0; poly = o.pts.map(([x, z]) => [x * sx, z * sz]); }
@@ -928,17 +1437,17 @@ function liquidMesh(o) {
     const b = (a + 1) % n, p = k * n, q = p + n;
     f.push({ i: [p + a, p + b, q + b, q + a], e: sideE });
   }
-  return { v, f, y, V, cap: c.cap };
+  return { v, f, y, V, cap: c.cap, poly: o.type === 'ext' ? c.poly : null };
 }
 const selObj = () => S.objs.find(o => o.id === S.sel);
 function updateFillUI() {
   const o = selObj(), on = !!(o && o.fill), out = $('#fillOut');
-  $('#fillOn').disabled = !o; $('#fillOn').checked = on; $('#fillBox').hidden = !on; out.hidden = !on;
+  $('#fillOn').disabled = !o || o.type === 'person'; $('#fillOn').checked = on; $('#fillBox').hidden = !on; out.hidden = !on;
   $('#fillOn').parentNode.title = o ? '' : 'Сначала выберите объект на сцене';
   if (!on) return;
   const c = cavity(o), V = Math.min(o.fill.vol, c.cap), y = fillLevel(c, V), act = document.activeElement;
   if (act !== $('#fillL')) $('#fillL').value = +(V / 1e6).toFixed(3);
-  if (act !== $('#fillWall')) $('#fillWall').value = +(o.fill.wall || 0);
+  if (act !== $('#fillWall')) $('#fillWall').value = +wallOf(o).toFixed(2);
   if (act !== $('#fillPct')) $('#fillPct').value = c.cap > 0 ? V / c.cap * 100 : 0;
   out.innerHTML = c.cap > 0
     ? `Уровень воды <b>${fmt(y)}</b> от дна · налито <b>${fmtVol(V)}</b> из ${fmtVol(c.cap)} (${Math.round(V / c.cap * 100)} %) · вес воды ${fmtKg(V / 1e6)}`
@@ -956,21 +1465,143 @@ function addObj(p) {
   return o;
 }
 function changed(retarget) { layout(retarget); renderList(); persist(); redraw(); }
+/* Объект крупнее окна в масштабе 1:1 — подсказать, как увидеть его целиком */
+function bigHint(o) {
+  if (!o || !S.W) return '';
+  const pv = worldVerts(o).map(makeProj()), xs = pv.map(p => p[0]), ys = pv.map(p => p[1]);
+  if (Math.max(...xs) - Math.min(...xs) < S.W * 0.92 && Math.max(...ys) - Math.min(...ys) < S.H * 0.92) return '';
+  return `«${o.name}» больше экрана — ${matchMedia('(pointer: coarse)').matches ? 'двойной тап по пустому месту' : 'клавиша 0 или двойной клик по пустому месту'} покажет его целиком (уже не 1:1)`;
+}
 /* Сохранение сцены + история для отмены (Ctrl+Z) */
-const hist = [];
-const strip = ({ mesh, _pv, _wv, _liq, rgb, px, pz, ...r }) => r;
-const sceneData = snap => ({ objs: JSON.parse(snap), unit: unit(), vol: S.vol, lit: S.lit });
+const hist = [], redoSt = [];
+const strip = o => { const r = {}; for (const k in o) if (k[0] !== '_' && !['mesh', 'rgb', 'px', 'pz'].includes(k)) r[k] = o[k]; return r; };
+const sceneData = snap => ({ app: 'razmer-1-1', v: 3, objs: JSON.parse(snap), unit: unit(), vol: S.vol, lit: S.lit, layout: S.layout });
 function persist() {
   const snap = JSON.stringify(S.objs.map(strip));
-  if (hist[hist.length - 1] !== snap) { hist.push(snap); if (hist.length > 80) hist.shift(); }
-  save(LS_SCENE, sceneData(snap));
+  if (hist[hist.length - 1] !== snap) { hist.push(snap); if (hist.length > 80) hist.shift(); redoSt.length = 0; }
+  save(LS_SCENE, sceneData(snap)); updateUndoUI();
 }
-function undo() {
-  if (hist.length < 2) return;
-  hist.pop(); const snap = hist[hist.length - 1], objs = JSON.parse(snap);
-  objs.forEach(o => { o.rgb = hex2rgb(o.color); o.mesh = buildMesh(o); });
-  S.objs = objs; if (!objs.some(o => o.id === S.sel)) S.sel = null;
-  layout(); renderList(); save(LS_SCENE, sceneData(snap)); redraw();
+function applySnap(snap) {
+  S.objs = loadObjs(JSON.parse(snap)); if (!S.objs.some(o => o.id === S.sel)) S.sel = null;
+  layout(); renderList(); save(LS_SCENE, sceneData(snap)); redraw(); updateUndoUI();
+}
+function undo() { if (hist.length < 2) return; redoSt.push(hist.pop()); applySnap(hist[hist.length - 1]); }
+function redo() { if (!redoSt.length) return; const s = redoSt.pop(); hist.push(s); applySnap(s); }
+function updateUndoUI() { const u = $('#btnUndo'), r = $('#btnRedo'); if (u) { u.disabled = hist.length < 2; r.disabled = !redoSt.length; } }
+/* Проверка объектов из файла, ссылки или старой версии: только известные поля и разумные числа */
+const TYPES = ['box', 'cyl', 'cone', 'pyr', 'sph', 'ext', 'person'];
+function cleanObj(o) {
+  if (!o || typeof o !== 'object') return null;
+  const n = v => typeof v === 'number' && isFinite(v) ? v : 0, type = TYPES.includes(o.type) ? o.type : 'box';
+  const l = n(o.l), w = n(o.w), h = n(o.h);
+  if (!(l > 0 && w > 0 && h > 0) || Math.max(l, w, h) > 1e6) return null;
+  const r = { id: Number.isInteger(o.id) && o.id > 0 ? o.id : 0, type, name: String(o.name ?? 'Объект').slice(0, 120), l, w, h,
+    rot: n(o.rot), color: /^#[0-9a-f]{6}$/i.test(o.color) ? o.color : PALETTE[0], ox: n(o.ox), oy: Math.max(0, n(o.oy)), oz: n(o.oz) };
+  if (type === 'ext') {
+    if (!Array.isArray(o.pts) || o.pts.length < 3 || o.pts.length > 5000) return null;
+    r.pts = o.pts.map(p => [n(p && p[0]), n(p && p[1])]);
+  }
+  const wall = n(o.wall ?? (o.fill && o.fill.wall)); if (wall > 0) r.wall = wall;     // в v2 стенки хранились в fill
+  if (o.fill && typeof o.fill === 'object' && type !== 'person') r.fill = { vol: Math.max(0, n(o.fill.vol)) };
+  return r;
+}
+function loadObjs(arr) {
+  const res = [], used = new Set();
+  for (const x of Array.isArray(arr) ? arr.slice(0, 500) : []) { const o = cleanObj(x); if (o) res.push(o); }
+  let next = Math.max(0, ...res.map(o => o.id)) + 1;
+  for (const o of res) { if (!o.id || used.has(o.id)) o.id = next++; used.add(o.id); }
+  res.forEach(o => { o.rgb = hex2rgb(o.color); o.mesh = buildMesh(o); S.nextId = Math.max(S.nextId, o.id + 1); });
+  return res;
+}
+/* Загрузка сцены целиком (из браузера, файла или ссылки). convert — пересчитать числа в полях под новые единицы */
+function loadScene(sc, convert) {
+  if (!sc || typeof sc !== 'object' || !Array.isArray(sc.objs)) return false;
+  S.objs = loadObjs(sc.objs); S.sel = null;
+  if (UNITS[sc.unit] && sc.unit !== unit()) { $('#fUnit').value = sc.unit; if (convert) $('#fUnit').onchange(); else lastUnit = sc.unit; }
+  if (typeof sc.vol === 'boolean') { S.vol = sc.vol; $('#fVol').checked = S.vol; }
+  if (typeof sc.lit === 'boolean') { S.lit = sc.lit; $('#fLit').checked = S.lit; }
+  if ((sc.layout === 'row' || sc.layout === 'over') && sc.layout !== S.layout) {
+    S.layout = sc.layout; $('#layRow').classList.toggle('on', S.layout === 'row'); $('#layOver').classList.toggle('on', S.layout !== 'row');
+  }
+  return true;
+}
+/* ---------- Ссылка на сцену: сцена сжимается (deflate) и кладётся в адрес после #s= ---------- */
+const SHARE_BASE = 'https://qwkejkqwje1.github.io/razmer-1-1/razmer.html';
+const b64u = u8 => { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode(...u8.subarray(i, i + 0x8000)); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
+const unb64u = t => Uint8Array.from(atob(t.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+const pipeBytes = async (u8, ts) => new Uint8Array(await new Response(new Blob([u8]).stream().pipeThrough(ts)).arrayBuffer());
+async function packScene() {
+  const raw = new TextEncoder().encode(JSON.stringify(sceneData(JSON.stringify(S.objs.map(strip)))));
+  try { if (window.CompressionStream) return 'z' + b64u(await pipeBytes(raw, new CompressionStream('deflate'))); } catch {}
+  return 'j' + b64u(raw);
+}
+async function unpackScene(code) {
+  const bytes = unb64u(code.slice(1));
+  const raw = code[0] === 'z' ? await pipeBytes(bytes, new DecompressionStream('deflate')) : code[0] === 'j' ? bytes : null;
+  if (!raw) throw new Error('format');
+  return JSON.parse(new TextDecoder().decode(raw));
+}
+async function shareLink() {
+  const code = await packScene();
+  const base = /^https?:$/.test(location.protocol) ? location.href.split('#')[0] : SHARE_BASE;
+  const link = base + '#s=' + code;
+  try { history.replaceState(null, '', '#s=' + code); } catch {}
+  let ok = false;
+  try { await navigator.clipboard.writeText(link); ok = true; } catch {}
+  if (ok) toast(`Ссылка скопирована (${link.length.toLocaleString('ru-RU')} символов) — вставьте её в сообщение`);
+  else prompt('Скопируйте ссылку на сцену:', link);
+}
+let hashBusy = false;
+async function openFromHash() {
+  const m = location.hash.match(/^#s=([A-Za-z0-9_-]+)$/); if (!m || hashBusy) return;
+  hashBusy = true;
+  try {
+    const sc = await unpackScene(m[1]);
+    if (loadScene(sc, true)) { changed(true); fitAll(true); toast(`Открыта сцена из ссылки: ${S.objs.length} ${plural(S.objs.length, 'объект', 'объекта', 'объектов')}. Ctrl+Z — вернуть прежнюю`); }
+  } catch { toast('Ссылка повреждена — сцену не удалось открыть'); }
+  try { history.replaceState(null, '', location.href.split('#')[0]); } catch {}   // чтобы перезагрузка не затирала правки
+  hashBusy = false;
+}
+window.addEventListener('hashchange', openFromHash);
+/* ---------- Файл сцены ---------- */
+function saveSceneFile() {
+  const blob = new Blob([JSON.stringify(sceneData(JSON.stringify(S.objs.map(strip))), null, 1)], { type: 'application/json' });
+  const a = document.createElement('a'); a.download = 'razmer-scene.json'; a.href = URL.createObjectURL(blob); a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+async function openSceneFile(file) {
+  let sc = null; try { sc = JSON.parse(await file.text()); } catch {}
+  if (sc && Array.isArray(sc)) sc = { objs: sc };
+  if (!loadScene(sc, true) ) return toast('Это не файл сцены «Размер 1:1»');
+  changed(true); fitAll(true); toast(`Открыто: ${S.objs.length} ${plural(S.objs.length, 'объект', 'объекта', 'объектов')} · Ctrl+Z — вернуть прежнюю сцену`);
+}
+/* ---------- Фото-подложка хранится в IndexedDB браузера (в localStorage картинки не влезают) ---------- */
+function idb() {
+  return new Promise((res, rej) => {
+    if (!window.indexedDB) return rej(new Error('no idb'));
+    const r = indexedDB.open('razmer-1-1', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('kv'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+}
+async function idbDo(mode, fn) {
+  const db = await idb();
+  try { return await new Promise((res, rej) => { const t = db.transaction('kv', mode), q = fn(t.objectStore('kv')); t.oncomplete = () => res(q && q.result); t.onerror = () => rej(t.error); }); }
+  finally { db.close(); }
+}
+let photoT = 0;
+function savePhoto() {
+  clearTimeout(photoT);
+  photoT = setTimeout(() => {
+    const b = S.bg;
+    idbDo('readwrite', st => b.img && b.blob ? st.put({ blob: b.blob, x: b.x, y: b.y, mpp: b.mpp, op: b.op }, 'photo') : st.delete('photo')).catch(() => {});
+  }, 300);
+}
+async function restorePhoto() {
+  let p; try { p = await idbDo('readonly', st => st.get('photo')); } catch { return; }
+  if (!p || !(p.blob instanceof Blob)) return;
+  const img = new Image();
+  img.onload = () => { URL.revokeObjectURL(img.src); Object.assign(S.bg, { img, blob: p.blob, x: +p.x || 0, y: +p.y || 0, mpp: +p.mpp || 1, op: +p.op || 0.6 }); $('#fImgOp').value = S.bg.op; redraw(); };
+  img.src = URL.createObjectURL(p.blob);
 }
 function setColor(id, color) {
   const o = S.objs.find(o => o.id === id); if (!o) return;
@@ -1006,7 +1637,7 @@ function renderList() {
       <button data-act="del" title="Удалить"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;vertical-align:-1px"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>`).join('') : '<p class="hint">Пока пусто — добавьте объект или пресет.</p>';
   $('#btnApply').disabled = !S.sel;
-  updateFillUI(); updateVolUI();
+  updateFillUI(); updateVolUI(); updateFitUI();
 }
 function select(id) {
   S.sel = id; const o = S.objs.find(o => o.id === id); if (o) fillForm(o);
@@ -1014,6 +1645,113 @@ function select(id) {
 }
 function delSelected() { if (!S.sel) return; S.objs = S.objs.filter(o => o.id !== S.sel); S.sel = null; changed(true); }
 function rotSelected(a) { const o = S.objs.find(o => o.id === S.sel); if (o) { o.rot += a; changed(); } }
+
+/* =====================================================================
+   6б. ВЛЕЗЕТ ЛИ? «Что» внутрь «Куда»: стенки, повороты (и на бок), круглое или прямоугольное дно,
+   сужение у конуса/пирамиды/шара. Сколько штук поместится — простыми рядами (без хитрой укладки).
+   ===================================================================== */
+const ROUND = t => t === 'cyl' || t === 'cone' || t === 'sph';
+function fitCavity(o) {
+  const c = cavity(o), t = wallOf(o);
+  return { L: Math.max(0, o.l - 2 * t), W: Math.max(0, o.w - 2 * t), H: c.H, round: ROUND(o.type), kind: c.kind, y0: c.y0, cap: c.cap, t };
+}
+/* Варианты положения предмета: a×b — след на дне, c — высота. dims — переложить коробку (на бок/торец) */
+function orients(o, side) {
+  const r = ROUND(o.type), res = [{ a: o.l, b: o.w, c: o.h, round: r, turn: 0, up: true }, { a: o.w, b: o.l, c: o.h, round: r, turn: 1, up: true }];
+  if (side && o.type === 'box') {
+    const d = [o.l, o.w, o.h];
+    for (const [i, j, k] of [[0, 2, 1], [2, 0, 1], [1, 2, 0], [2, 1, 0]]) res.push({ a: d[i], b: d[j], c: d[k], round: false, dims: [d[i], d[j], d[k]], up: false });
+  }
+  return res;
+}
+function fpFits(a, b, ri, L, W, rc) {
+  if (rc && !ri) return (a / L) ** 2 + (b / W) ** 2 <= 1 + 1e-9;       // углы прямоугольника внутри круга/эллипса
+  return a <= L + 1e-6 && b <= W + 1e-6;
+}
+function tryOrient(q, C) {
+  const s = C.kind === 'apex' ? 1 - q.c / C.H : C.kind === 'ell' ? Math.sqrt(Math.max(0, 1 - (q.c / C.H) ** 2)) : 1;
+  const L = C.L * Math.max(0, s), W = C.W * Math.max(0, s);
+  let fa, fb;
+  if (C.round && !q.round) { const k = Math.hypot(q.a / (L || 1e-9), q.b / (W || 1e-9)); fa = (1 - k) * L; fb = (1 - k) * W; }
+  else { fa = L - q.a; fb = W - q.b; }
+  const fc = C.H - q.c, ok = fc >= -1e-6 && L > 0 && fpFits(q.a, q.b, q.round, L, W, C.round);
+  return { ...q, ok, fa, fb, fc, score: Math.min(fa, fb, fc) };
+}
+function packCount(q, C) {
+  if (!q.ok) return 0;
+  if (C.kind !== 'prism') return 1;
+  const layers = Math.floor(C.H / q.c + 1e-9);
+  if (!C.round) return Math.floor(C.L / q.a + 1e-9) * Math.floor(C.W / q.b + 1e-9) * layers;
+  const R1 = C.L / 2, R2 = C.W / 2; let best = 1;
+  for (let r = 1; r <= Math.floor(C.W / q.b + 1e-9); r++) {      // r рядов по ширине, по центру
+    let n = 0;
+    for (let k = 0; k < r; k++) {
+      const z0 = -r * q.b / 2 + k * q.b, z1 = z0 + q.b;
+      if (q.round) { const zc = (z0 + z1) / 2, A = R1 - q.a / 2, B = R2 - q.b / 2, t = 1 - (zc / (B || 1e-9)) ** 2; if (A > 0 && B > 0 && t >= 0) n += Math.floor(2 * A * Math.sqrt(t) / q.a + 1e-9) + 1; }
+      else { const zm = Math.max(Math.abs(z0), Math.abs(z1)), t = 1 - (zm / R2) ** 2; if (t > 0) n += Math.floor(2 * R1 * Math.sqrt(t) / q.a + 1e-9); }
+    }
+    best = Math.max(best, n);
+  }
+  return best * layers;
+}
+function fitCheck(it, co, side) {
+  const C = fitCavity(co), all = orients(it, side).map(q => tryOrient(q, C));
+  const pick = arr => arr.reduce((a, b) => (b.score > a.score ? b : a), arr[0]);
+  const up = all.filter(q => q.up && q.ok), any = all.filter(q => q.ok);
+  const best = up.length ? pick(up) : any.length ? pick(any) : pick(all);
+  const count = Math.max(0, ...all.map(q => packCount(q, C)));
+  return { C, best, count, ok: best.ok };
+}
+let fitSig = '', fitRes = null;
+function updateFitUI() {
+  const sw = $('#fitWhat'), sh = $('#fitWhere'), out = $('#fitOut'); if (!sw) return;
+  const objs = S.objs, cont = objs.filter(o => o.type !== 'person');
+  const sg = objs.map(o => o.id + ':' + o.name + ':' + fmt3(o)).join('|');
+  if (sg !== fitSig) {
+    fitSig = sg; const kw = sw.value, kh = sh.value;
+    const opt = o => `<option value="${o.id}">${esc(o.name)} — ${fmt3(o)}</option>`;
+    sw.innerHTML = objs.map(opt).join(''); sh.innerHTML = cont.map(opt).join('');
+    if (objs.some(o => String(o.id) === kw)) sw.value = kw; else sw.value = '';
+    if (cont.some(o => String(o.id) === kh)) sh.value = kh; else sh.value = '';
+  }
+  const byVol = arr => arr.slice().sort((a, b) => volumeMm3(a) - volumeMm3(b));
+  if (!sw.value && objs.length) sw.value = String((S.sel && objs.some(o => o.id === S.sel) && cont.length > 1 ? S.sel : byVol(objs)[0].id));
+  if ((!sh.value || sh.value === sw.value) && cont.length) { const big = byVol(cont).reverse().find(o => String(o.id) !== sw.value); if (big) sh.value = String(big.id); }
+  const it = objs.find(o => String(o.id) === sw.value), co = cont.find(o => String(o.id) === sh.value);
+  fitRes = null; $('#fitShow').disabled = true;
+  if (!it || !co || it === co) { out.innerHTML = objs.length < 2 ? 'Добавьте хотя бы два объекта: что кладём и куда.' : 'Выберите два разных объекта.'; return; }
+  if (document.activeElement !== $('#fitWall')) $('#fitWall').value = +wallOf(co).toFixed(2);
+  const r = fitCheck(it, co, $('#fitSide').checked), q = r.best, C = r.C; fitRes = { it, co, ...r };
+  const f = v => fmt(Math.abs(v)), inner = C.round ? `Ø ${fmt(C.L)}${Math.abs(C.L - C.W) > 0.01 ? '×' + fmt(C.W) : ''}, глубина ${fmt(C.H)}` : `${num(fromMm(C.L))}×${num(fromMm(C.W))}×${num(fromMm(C.H))}${usfx()}`;
+  const how = q.up ? (q.turn ? 'повернув на 90°' : 'как стоит') : `положив ${q.c === Math.min(it.l, it.w, it.h) ? 'плашмя' : 'на бок'}: ${num(fromMm(q.a))}×${num(fromMm(q.b))}×${num(fromMm(q.c))}${usfx()}`;
+  const gaps = arr => arr.filter(([v]) => v > 0.05).map(([v, n]) => `${n} ${f(v)}`).join(', ');
+  let h;
+  if (r.ok) {
+    const top = C.kind === 'ell' ? 'по высоте' : 'сверху';
+    const free = C.round && !q.round ? [[q.fc, top]] : [[q.fa, 'по длине'], [q.fb, 'по ширине'], [q.fc, top]];
+    const pct = C.cap > 0 ? volumeMm3(it) / C.cap * 100 : 0;
+    h = `<b style="color:var(--ok)">✓ Влезет</b> — ${how}.` + (gaps(free) ? `<br>Запас: ${gaps(free)}.` : '<br>Впритык.')
+      + `<br>Займёт ${pct < 1 ? sig(pct, 2) : Math.round(pct)} % объёма.` + (r.count > 1 ? ` Поместится ≈ ${r.count} шт. (ровными рядами).` : '');
+    $('#fitShow').disabled = false;
+  } else {
+    const lack = C.round && !q.round ? [[-Math.min(q.fa, 0), 'по диаметру'], [-q.fc, 'по высоте']] : [[-q.fa, 'по длине'], [-q.fb, 'по ширине'], [-q.fc, 'по высоте']];
+    h = `<b style="color:#C4554D">✗ Не влезет.</b> Лучший вариант — ${how}, но не хватает: ${gaps(lack) || 'чуть-чуть'}.`;
+  }
+  out.innerHTML = h + `<br><span class="hint">Внутри «${esc(co.name)}»: ${inner}${C.t ? ` (стенки ${fmt(C.t)})` : ''}${co.type === 'ext' ? ' — по габариту чертежа' : ''}.</span>`;
+}
+/* Поставить «Что» внутрь «Куда» в найденном положении */
+function placeInside() {
+  if (!fitRes || !fitRes.ok) return;
+  const { it, co, best: q, C } = fitRes;
+  if (q.dims) { [it.l, it.w, it.h] = q.dims; it.mesh = buildMesh(it); it.rot = co.rot; }
+  else it.rot = co.rot + (q.turn ? Math.PI / 2 : 0);
+  layout();
+  const cw = xform(co, [[0, 0, 0]])[0], bi = bbox(rotVerts(it));
+  it.ox = cw[0] - it.px - (bi[0] + bi[3]) / 2; it.oz = cw[2] - it.pz - (bi[2] + bi[5]) / 2;
+  it.oy = (co.oy || 0) + C.y0 + (C.kind === 'ell' ? (C.H - q.c) / 2 : 0);
+  S.sel = it.id; fillForm(it); changed();
+  toast(`«${it.name}» внутри «${co.name}». Ctrl+Z — вернуть`);
+}
 
 /* =====================================================================
    7. ЧЕРЧЕНИЕ И ЛИНЕЙКА
@@ -1030,7 +1768,7 @@ function setMode(m) {
 }
 /* экранная точка → мм в плоскости экрана (с привязкой к сетке) */
 function toSketch(x, y, shift) {
-  const k = pxmm() * S.zoom, [ox, oy] = origin(), st = +$('#fSnap').value;
+  const k = scaleK(), [ox, oy] = origin(), st = +$('#fSnap').value;
   let p = [(x - ox) / k, (y - oy) / k];
   if (st) p = p.map(v => Math.round(v / st) * st);
   const last = S.draw.pts[S.draw.pts.length - 1];
@@ -1039,7 +1777,7 @@ function toSketch(x, y, shift) {
 }
 function closeEnough() {
   const D = S.draw; if (D.pts.length < 3 || !D.hover) return false;
-  return Math.hypot(D.hover[0] - D.pts[0][0], D.hover[1] - D.pts[0][1]) * pxmm() * S.zoom < 12;
+  return Math.hypot(D.hover[0] - D.pts[0][0], D.hover[1] - D.pts[0][1]) * scaleK() < 12;
 }
 function finishSketch() {
   const pts = S.draw.pts; if (pts.length < 3) return;
@@ -1053,14 +1791,14 @@ function finishSketch() {
 /* Подогнать фото: отрезок линейки = известный реальный размер */
 function fitPhoto() {
   if (!S.measure || !S.bg.img) return;
-  const { a, b } = S.measure, modelMm = Math.hypot(b[0] - a[0], b[1] - a[1]) / (pxmm() * S.zoom);
-  const v = prompt(`Какой реальный размер у этого отрезка на фото? (${unit() === 'cm' ? 'см' : 'мм'})`);
+  const { a, b } = S.measure, modelMm = Math.hypot(b[0] - a[0], b[1] - a[1]) / (scaleK());
+  const v = prompt(`Какой реальный размер у этого отрезка на фото? (${UNAME[unit()]})`);
   const real = toMm(parseFloat(String(v).replace(',', '.')));
   if (!(real > 0) || !(modelMm > 0)) return;
-  const f = real / modelMm, [ox, oy] = origin(), k = pxmm() * S.zoom;
+  const f = real / modelMm, [ox, oy] = origin(), k = scaleK();
   // масштабируем вокруг середины отрезка, чтобы фото не «уехало»
   const mx = ((a[0] + b[0]) / 2 - ox) / k, my = ((a[1] + b[1]) / 2 - oy) / k;
-  S.bg.x = mx + (S.bg.x - mx) * f; S.bg.y = my + (S.bg.y - my) * f; S.bg.mpp *= f;
+  S.bg.x = mx + (S.bg.x - mx) * f; S.bg.y = my + (S.bg.y - my) * f; S.bg.mpp *= f; savePhoto();
   S.measure = null; redraw();
 }
 
@@ -1071,7 +1809,7 @@ let drag = null;
 /* Сдвиг объекта мышью: экранное смещение → смещение по полу (в виде сбоку или с Ctrl — по высоте) */
 function dragObject(e) {
   const o = S.objs.find(o => o.id === drag.id); if (!o) return;
-  const k = pxmm() * S.zoom, dx = (e.offsetX - drag.sx) / k, dy = (e.offsetY - drag.sy) / k;
+  const k = scaleK(), dx = (e.offsetX - drag.sx) / k, dy = (e.offsetY - drag.sy) / k;
   const cy = Math.cos(S.yaw), sy = Math.sin(S.yaw), sp = Math.sin(S.pitch), cp = Math.cos(S.pitch);
   const vertical = e.ctrlKey || e.metaKey || Math.abs(sp) < 0.35;
   const z1 = vertical ? 0 : dy / sp;                     // смещение «вглубь» в координатах камеры
@@ -1081,9 +1819,24 @@ function dragObject(e) {
   if (vertical) o.oy = Math.max(0, snap(drag.o[1] - dy / Math.max(Math.abs(cp), 0.2)));
   redraw();
 }
+const touches = new Map();   // активные пальцы: pointerId → [x, y]
+let pinch = null, lastTap = { t: 0, x: 0, y: 0 }, lastPtr = 'mouse';
+function pinchState() {
+  const [a, b] = [...touches.values()];
+  return { d: Math.hypot(b[0] - a[0], b[1] - a[1]) || 1, m: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] };
+}
 cv.addEventListener('pointerdown', e => {
-  cv.setPointerCapture(e.pointerId); anim = null;
+  cv.setPointerCapture(e.pointerId); anim = null; lastPtr = e.pointerType;
   const x = e.offsetX, y = e.offsetY;
+  if (e.pointerType === 'touch') {
+    touches.set(e.pointerId, [x, y]);
+    if (touches.size >= 2) {                         // второй палец — начинаем щипок (зум + сдвиг двумя пальцами)
+      if (drag && drag.kind === 'obj') { renderList(); persist(); }
+      if (S.mode === 'draw' && S.draw.pts.length) { S.draw.pts.pop(); }   // первый палец не ставит точку
+      if (drag && drag.kind === 'measure') S.measure = null;
+      drag = null; const p = pinchState(); pinch = { d0: p.d, m0: p.m, z0: S.zoom, o0: origin() }; redraw(); return;
+    }
+  }
   if (S.mode === 'draw' && e.button === 0) {
     if (closeEnough()) return finishSketch();
     S.draw.pts.push(toSketch(x, y, e.shiftKey)); redraw(); return;
@@ -1098,6 +1851,14 @@ cv.addEventListener('pointerdown', e => {
 });
 cv.addEventListener('pointermove', e => {
   const x = e.offsetX, y = e.offsetY;
+  if (e.pointerType === 'touch' && touches.has(e.pointerId)) touches.set(e.pointerId, [x, y]);
+  if (pinch) {
+    if (touches.size < 2) return;
+    const p = pinchState(); let z = Math.max(0.05, Math.min(20, pinch.z0 * p.d / pinch.d0));
+    if (Math.abs(z - 1) < 0.04) z = 1;                 // «прилипание» к 1:1
+    const ox = p.m[0] - (pinch.m0[0] - pinch.o0[0]) * z / pinch.z0, oy = p.m[1] - (pinch.m0[1] - pinch.o0[1]) * z / pinch.z0;
+    S.zoom = z; S.panX = ox - S.W / 2; S.panY = oy - S.H / 2; redraw(); return;
+  }
   if (S.mode === 'draw') { S.draw.hover = toSketch(x, y, e.shiftKey); redraw(); }
   if (!drag) return;
   if (drag.kind === 'measure') { S.measure.b = [x, y]; redraw(); return; }
@@ -1110,20 +1871,35 @@ cv.addEventListener('pointermove', e => {
     const b1 = camAxes().b; S.tx = cam[0] - b1[0] * S.dist; S.ty = cam[1] - b1[1] * S.dist; S.tz = cam[2] - b1[2] * S.dist;
   }
   else if (drag.kind === 'pan') { S.panX += dx; S.panY += dy; }
-  else if (drag.kind === 'bg') { const k = pxmm() * S.zoom; S.bg.x += dx / k; S.bg.y += dy / k; }
+  else if (drag.kind === 'bg') { const k = scaleK(); S.bg.x += dx / k; S.bg.y += dy / k; }
   redraw();
 });
+function endTouch(e) {
+  touches.delete(e.pointerId);
+  if (pinch) { if (!touches.size) pinch = null; drag = null; updateHud(); return true; }   // после щипка оставшийся палец ничего не делает
+  return false;
+}
+cv.addEventListener('pointercancel', e => { endTouch(e); if (drag && drag.kind === 'obj') { renderList(); persist(); } drag = null; cv.style.cursor = ''; });
 cv.addEventListener('pointerup', e => {
-  const click = drag && Math.hypot(e.offsetX - drag.sx, e.offsetY - drag.sy) < 4;
+  if (e.pointerType === 'touch' && endTouch(e)) return;
+  const click = drag && Math.hypot(e.offsetX - drag.sx, e.offsetY - drag.sy) < (e.pointerType === 'touch' ? 10 : 4);
+  if (e.pointerType === 'touch' && click && drag.kind !== 'measure') {   // двойной тап = двойной клик
+    const t = performance.now();
+    if (t - lastTap.t < 330 && Math.hypot(e.offsetX - lastTap.x, e.offsetY - lastTap.y) < 30) {
+      lastTap.t = 0; drag = null; const id = hitTest(e.offsetX, e.offsetY); if (id) focusObj(id); else if (!S.fly) fitAll(); return;
+    }
+    lastTap = { t, x: e.offsetX, y: e.offsetY };
+  }
   if (drag && drag.kind === 'rot' && click) select(null);
   if (drag && drag.kind === 'obj' && !click) { renderList(); persist(); }
+  if (drag && drag.kind === 'bg') savePhoto();
   drag = null; cv.style.cursor = ''; updateHud();
 });
-cv.addEventListener('dblclick', e => { const id = hitTest(e.offsetX, e.offsetY); if (id) focusObj(id); else if (!S.fly) fitAll(); });
+cv.addEventListener('dblclick', e => { if (lastPtr === 'touch') return; const id = hitTest(e.offsetX, e.offsetY); if (id) focusObj(id); else if (!S.fly) fitAll(); });
 cv.addEventListener('contextmenu', e => e.preventDefault());
 cv.addEventListener('wheel', e => {
   e.preventDefault();
-  if (e.altKey && S.bg.img) { S.bg.mpp *= Math.exp(-e.deltaY * 0.001); return redraw(); }
+  if (e.altKey && S.bg.img) { S.bg.mpp *= Math.exp(-e.deltaY * 0.001); savePhoto(); return redraw(); }
   if (S.fly) { S.flySpeed = Math.max(20, Math.min(5000, S.flySpeed * Math.exp(-e.deltaY * 0.002))); return redraw(); }
   const old = S.zoom; let z = old * Math.exp(-e.deltaY * 0.0012);
   z = Math.max(0.05, Math.min(20, z)); if (Math.abs(z - 1) < 0.04 && Math.abs(old - 1) >= 1e-3) z = 1; // «прилипание» к 1:1
@@ -1133,7 +1909,7 @@ cv.addEventListener('wheel', e => {
 }, { passive: false });
 /* Выбор объекта кликом: ищем объект, чья проекция содержит точку (ближайший к зрителю) */
 function hitTest(x, y) {
-  let best = null, bd = -Infinity;
+  const hits = new Map();                              // объект → глубина ближайшей грани под курсором
   for (const o of S.objs) {
     if (!o._pv) continue;
     for (const f of o.mesh.f) {
@@ -1142,15 +1918,25 @@ function hitTest(x, y) {
         const [xi, yi] = poly[i], [xj, yj] = poly[j];
         if ((yi > y) !== (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi) inside = !inside;
       }
-      if (inside) { const d = poly.reduce((s, p) => s + p[2], 0) / poly.length; if (d > bd) { bd = d; best = o.id; } }
+      if (inside) { const d = poly.reduce((s, p) => s + p[2], 0) / poly.length; if (!hits.has(o) || d > hits.get(o)) hits.set(o, d); }
     }
   }
-  return best;
+  let best = null, bd = -Infinity;
+  for (const [o, d] of hits) if (d > bd) { bd = d; best = o; }
+  // клик по «стеклянному» контейнеру там, где виден вложенный предмет, выбирает предмет
+  for (let go = !!best; go;) {
+    go = false; let kid = null, kd = -Infinity;
+    for (const [o, d] of hits) if (o._par === best && d > kd) { kd = d; kid = o; }
+    if (kid) { best = kid; go = true; }
+  }
+  return best ? best.id : null;
 }
 function onKey(e) {
   const t = e.target; if (t && (t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA')) return;
   if (!$('#calib').hidden || !$('#help').hidden) { if (e.key === 'Escape') { $('#calib').hidden = true; $('#help').hidden = true; } return; }
+  if ((e.ctrlKey || e.metaKey) && (e.code === 'KeyY' || (e.code === 'KeyZ' && e.shiftKey))) { e.preventDefault(); return redo(); }
   if ((e.ctrlKey || e.metaKey) && e.code === 'KeyZ') { e.preventDefault(); return undo(); }
+  if ((e.ctrlKey || e.metaKey) && e.code === 'KeyP') { e.preventDefault(); return printScene(); }
   const FLY = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'Space', 'ShiftLeft', 'ShiftRight'];
   if (S.fly && FLY.includes(e.code)) { e.preventDefault(); held.add(e.code); return; }
   // стрелки — точный сдвиг выбранного (1 мм или шаг привязки, Shift ×10); PageUp/PageDown — высота
@@ -1193,28 +1979,37 @@ function togglePersp() { S.persp = !S.persp; $('#camOrtho').classList.toggle('on
 function toggleLayout() { S.layout = S.layout === 'row' ? 'over' : 'row'; $('#layRow').classList.toggle('on', S.layout === 'row'); $('#layOver').classList.toggle('on', S.layout !== 'row'); changed(true); }
 function toggleCompact() { document.body.classList.toggle('compact'); redraw(); }
 
-$('#btnAdd').onclick = () => { const f = readForm(); if (f) { addObj(f); fillForm(S.objs[S.objs.length - 1]); $('#fColor').value = PALETTE[(S.nextId - 1) % PALETTE.length]; } };
+$('#btnAdd').onclick = () => { const f = readForm(); if (f) { const o = addObj(f), h = bigHint(o); fillForm(o); $('#fColor').value = PALETTE[(S.nextId - 1) % PALETTE.length]; if (h) toast(h, 6000); } };
 $('#btnApply').onclick = applyToSelected;
 $('#fShape').onchange = () => {
   const t = $('#fShape').value;
   $('#fHint').textContent = t === 'cyl' || t === 'cone' ? 'Для цилиндра/конуса: Длина и Ширина = диаметр (разные — получится овал).'
-    : t === 'sph' ? 'Для шара все три размера = диаметр.' : 'Порядок как в магазинах: Д × Ш × В. Длина — влево-вправо, ширина — вглубь, высота — вверх.';
+    : t === 'sph' ? 'Для шара все три размера = диаметр.'
+    : t === 'person' ? 'Человек: Высота — рост, Длина — ширина с руками (≈0,3 роста), Ширина — глубина (≈0,16 роста).'
+    : 'Порядок как в магазинах: Д × Ш × В. Длина — влево-вправо, ширина — вглубь, высота — вверх.';
 };
+let lastUnit = unit();
 $('#fUnit').onchange = () => {   // пересчитываем введённые числа в новые единицы
-  const f = $('#fUnit').value === 'cm' ? 0.1 : 10;
-  ['#fL', '#fW', '#fH', '#fExtH'].forEach(s => $(s).value = +(+$(s).value * f).toFixed(2));
+  const f = UNITS[lastUnit] / UNITS[unit()]; lastUnit = unit();
+  ['#fL', '#fW', '#fH', '#fExtH'].forEach(s => $(s).value = +(+$(s).value * f).toFixed(3));
   renderList(); persist(); redraw();
 };
 { const n1 = v => (+v.toFixed(1)).toLocaleString('ru-RU'), opt = (p, i) => `<option value="${i}">${p[0]} — ${n1(p[2])}×${n1(p[3])}×${n1(p[4])} мм</option>`;
-  $('#fPreset').innerHTML = `<optgroup label="Предметы">${PRESETS.map(opt).join('')}</optgroup><optgroup label="Объём и литры">`
-    + PRESETS_VOL.map((p, i) => opt(p, PRESETS.length + i).replace(' мм</option>', ` мм · ${fmtVol(volumeMm3({ type: p[1], l: p[2], w: p[3], h: p[4] }))}</option>`)).join('') + '</optgroup>'; }
-$('#btnPreset').onclick = () => { const p = ALL_PRESETS[$('#fPreset').value]; addObj({ name: p[0], type: p[1], l: p[2], w: p[3], h: p[4], color: '#B9B6B0' }); };
+  const vol = (p, i) => opt(p, i).replace(' мм</option>', ` мм · ${fmtVol(volumeMm3({ type: p[1], l: p[2], w: p[3], h: p[4] }))}</option>`);
+  $('#fPreset').innerHTML = `<optgroup label="Предметы">${PRESETS.map(opt).join('')}</optgroup>`
+    + `<optgroup label="Объём и литры">${PRESETS_VOL.map((p, i) => vol(p, PRESETS.length + i)).join('')}</optgroup>`
+    + `<optgroup label="Крупные вещи">${PRESETS_BIG.map((p, i) => opt(p, PRESETS.length + PRESETS_VOL.length + i)).join('')}</optgroup>`; }
+$('#btnPreset').onclick = () => {
+  const p = ALL_PRESETS[$('#fPreset').value];
+  const o = addObj({ name: p[0], type: p[1], l: p[2], w: p[3], h: p[4], color: p[1] === 'person' ? '#C2A68C' : '#B9B6B0', ...(p[5] ? { wall: p[5] } : {}) });
+  const h = bigHint(o); if (h) toast(h, 6000);
+};
 $('#list').onclick = e => {
   const row = e.target.closest('.obj'); if (!row) return; const id = +row.dataset.id, act = e.target.dataset.act;
   if (e.target.classList.contains('sw')) return;
   if (act === 'del') { S.sel = id; return delSelected(); }
   if (act === 'rot') { S.sel = id; return rotSelected(Math.PI / 2); }
-  if (act === 'dup') { const o = S.objs.find(o => o.id === id); const { mesh, _pv, _wv, _liq, id: _, ...c } = o; return addObj({ ...c, fill: o.fill ? { ...o.fill } : undefined, ox: 0, oy: 0, oz: 0, name: o.name + ' (копия)' }); }
+  if (act === 'dup') { const o = S.objs.find(o => o.id === id), c = strip(o); delete c.id; return addObj({ ...c, fill: o.fill ? { ...o.fill } : undefined, ox: 0, oy: 0, oz: 0, name: o.name + ' (копия)' }); }
   select(id);
 };
 $('#btnClear').onclick = () => { if (S.objs.length && confirm('Удалить все объекты?')) { S.objs = []; S.sel = null; changed(true); } };
@@ -1222,6 +2017,16 @@ $('#list').oninput = e => { if (e.target.classList.contains('sw')) setColor(+e.t
 $('#list').onchange = e => { if (e.target.classList.contains('sw')) { if (+e.target.closest('.obj').dataset.id === S.sel) $('#fColor').value = e.target.value; persist(); } };
 $('#fColor').oninput = e => { if (S.sel) { setColor(S.sel, e.target.value); const sw = $(`.obj[data-id="${S.sel}"] .sw`); if (sw) sw.value = e.target.value; } };
 $('#fColor').onchange = () => S.sel && persist();
+$('#fTextGo').onclick = () => { if (addFromText($('#fText').value)) $('#fText').value = ''; };
+$('#fText').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('#fTextGo').click(); } });
+$('#fitWhat').onchange = $('#fitWhere').onchange = $('#fitSide').onchange = updateFitUI;
+$('#fitSwap').onclick = () => { const a = $('#fitWhat').value, b = $('#fitWhere').value; $('#fitWhat').value = b; $('#fitWhere').value = a; updateFitUI(); };
+$('#fitShow').onclick = placeInside;
+$('#fitWall').oninput = e => { const co = S.objs.find(o => String(o.id) === $('#fitWhere').value); if (!co) return; co.wall = numIn(e.target); updateFillUI(); updateFitUI(); redraw(); };
+$('#fitWall').onchange = () => { persist(); renderList(); };
+$('#btnUndo').onclick = undo; $('#btnRedo').onclick = redo;
+$('#btnShare').onclick = shareLink; $('#btnSave').onclick = saveSceneFile; $('#btnOpen').onclick = () => $('#fScene').click();
+$('#fScene').onchange = e => { const f = e.target.files[0]; e.target.value = ''; if (f) openSceneFile(f); };
 $('#btnResetPos').onclick = () => { S.objs.forEach(o => { o.ox = o.oy = o.oz = 0; }); changed(true); };
 $('#btnFly').onclick = toggleFly; $('#btnOrbit').onclick = toggleOrbit; $('#btnFit').onclick = fitAll;
 $('#camOrtho').onclick = () => S.persp && togglePersp();
@@ -1252,19 +2057,20 @@ $('#vApply').onclick = () => {                 // пропорционально
 const numIn = el => { const v = parseFloat(String(el.value).replace(',', '.')); return v > 0 ? v : 0; };
 $('#fillOn').onchange = e => {
   const o = selObj(); if (!o) return;
-  if (e.target.checked) { o.fill = { vol: 0, wall: numIn($('#fillWall')) }; o.fill.vol = cavity(o).cap / 2; }
+  if (e.target.checked) { o.fill = { vol: 0 }; o.fill.vol = cavity(o).cap / 2; }
   else delete o.fill;
   renderList(); persist(); redraw();
 };
 $('#fillPct').oninput = e => { const o = selObj(); if (!o || !o.fill) return; o.fill.vol = cavity(o).cap * e.target.value / 100; updateFillUI(); redraw(); };
 $('#fillL').oninput = e => { const o = selObj(); if (!o || !o.fill) return; o.fill.vol = numIn(e.target) * 1e6; updateFillUI(); redraw(); };
-$('#fillWall').oninput = e => { const o = selObj(); if (!o || !o.fill) return; o.fill.wall = numIn(e.target); updateFillUI(); redraw(); };
+$('#fillWall').oninput = e => { const o = selObj(); if (!o || !o.fill) return; o.wall = numIn(e.target); updateFillUI(); updateFitUI(); redraw(); };
 ['#fillPct', '#fillL', '#fillWall'].forEach(q => $(q).addEventListener('change', () => { persist(); updateFillUI(); }));
 $('#btnDraw').onclick = () => setMode('draw');
 $('#btnMeasure').onclick = () => setMode('measure');
 $('#btnCompact').onclick = toggleCompact; $('#fabPanel').onclick = toggleCompact;
 $('#fabReset').onclick = resetView; $('#fabFit').onclick = fitPhoto;
 $('#btnFull').onclick = () => document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+$('#btnPrint').onclick = printScene;
 $('#btnPng').onclick = () => { const a = document.createElement('a'); a.download = 'razmer-1-1.png'; a.href = cv.toDataURL('image/png'); a.click(); };
 $('#btnHelp').onclick = () => $('#help').hidden = false; $('#helpClose').onclick = () => $('#help').hidden = true;
 
@@ -1272,15 +2078,33 @@ $('#btnHelp').onclick = () => $('#help').hidden = false; $('#helpClose').onclick
 function setImage(file) {
   if (!file || !file.type.startsWith('image/')) return;
   const img = new Image();
-  img.onload = () => { URL.revokeObjectURL(img.src); const k = pxmm() * S.zoom; Object.assign(S.bg, { img, x: 0, y: 0, mpp: (S.H * 0.8 / k) / img.height }); redraw(); };
+  img.onload = () => { URL.revokeObjectURL(img.src); const k = scaleK(); Object.assign(S.bg, { img, blob: file, x: 0, y: 0, mpp: (S.H * 0.8 / k) / img.height }); savePhoto(); redraw(); };
   img.src = URL.createObjectURL(file);
 }
 $('#btnImg').onclick = () => $('#fImg').click();
 $('#fImg').onchange = e => setImage(e.target.files[0]);
-$('#btnImgDel').onclick = () => { S.bg.img = null; redraw(); };
-$('#fImgOp').oninput = e => { S.bg.op = +e.target.value; redraw(); };
-function onPaste(e) { if (importScreenData(e.clipboardData?.getData('text'))) return; const it = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith('image/')); if (it) setImage(it.getAsFile()); }
-const onDragOver = e => e.preventDefault(), onDrop = e => { e.preventDefault(); setImage(e.dataTransfer.files[0]); };
+$('#btnImgDel').onclick = () => { S.bg.img = null; S.bg.blob = null; savePhoto(); redraw(); };
+$('#fImgOp').oninput = e => { S.bg.op = +e.target.value; savePhoto(); redraw(); };
+function onPaste(e) {
+  const txt = e.clipboardData?.getData('text') || '';
+  if (importScreenData(txt)) return;
+  const it = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith('image/'));
+  if (it) return setImage(it.getAsFile());
+  const t = e.target;                                  // в поле ввода — обычная вставка
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+  if (txt.trim()) { e.preventDefault(); if (!addFromText(txt, true)) toast('В тексте не нашлось размеров. Пример: «60×40×85 см»'); }
+}
+const onDragOver = e => e.preventDefault();
+async function onDrop(e) {
+  e.preventDefault(); const f = e.dataTransfer.files[0]; if (!f) return;
+  if (f.type.startsWith('image/')) return setImage(f);
+  if (/\.json$/i.test(f.name) || f.type === 'application/json') return openSceneFile(f);
+  if (/\.js$/i.test(f.name)) {                       // screen-data.js от detect-screen
+    const m = (await f.text()).match(/SCREEN_EDID\s*=\s*(\[[\s\S]*?\])\s*;?\s*$/);
+    if (m && importScreenData('R11:' + m[1])) return;
+  }
+  toast('Этот файл не подходит: нужна картинка, сцена .json или screen-data.js');
+}
 document.addEventListener('paste', onPaste); document.addEventListener('dragover', onDragOver); document.addEventListener('drop', onDrop);
 
 /* =====================================================================
@@ -1297,37 +2121,89 @@ const MAC = [
   ['Apple Studio Display 27″', 27, 5120, 2880], ['Apple Pro Display XDR 32″', 32, 6016, 3384],
 ];
 const macWidthMm = m => m[2] * m[1] * 25.4 / Math.hypot(m[2], m[3]);
+/* iPhone и iPad: [название, CSS-ширина, CSS-высота (в портрете), ppi, пикселей по короткой стороне] */
+const IOS = [
+  ['iPhone SE (2-е, 3-е), 8, 7', 375, 667, 326, 750], ['iPhone 8 Plus, 7 Plus', 414, 736, 401, 1080],
+  ['iPhone X, XS, 11 Pro', 375, 812, 458, 1125], ['iPhone XR, 11', 414, 896, 326, 828], ['iPhone XS Max, 11 Pro Max', 414, 896, 458, 1242],
+  ['iPhone 12 mini, 13 mini', 375, 812, 476, 1080], ['iPhone 12, 12 Pro, 13, 13 Pro, 14, 16e', 390, 844, 460, 1170],
+  ['iPhone 12 Pro Max, 13 Pro Max, 14 Plus', 428, 926, 458, 1284], ['iPhone 14 Pro, 15, 15 Pro, 16', 393, 852, 460, 1179],
+  ['iPhone 14 Pro Max, 15 Plus, 15 Pro Max, 16 Plus', 430, 932, 460, 1290], ['iPhone 16 Pro, 17, 17 Pro', 402, 874, 460, 1206],
+  ['iPhone Air', 420, 912, 460, 1260], ['iPhone 16 Pro Max, 17 Pro Max', 440, 956, 460, 1320],
+  ['iPad mini 6, 7 (8,3″)', 744, 1133, 326, 1488], ['iPad 9 (10,2″)', 810, 1080, 264, 1620], ['iPad 10, 11, iPad Air 11″', 820, 1180, 264, 1640],
+  ['iPad Pro 11″ (2018–2022)', 834, 1194, 264, 1668], ['iPad Pro 11″ (M4)', 834, 1210, 264, 1668],
+  ['iPad Pro 12,9″, iPad Air 13″', 1024, 1366, 264, 2048], ['iPad Pro 13″ (M4)', 1032, 1376, 264, 2064],
+];
+const iosWidthMm = m => m[4] / m[3] * 25.4;            // короткая сторона экрана, мм
 const d1 = v => v.toFixed(1).replace('.', ','), cm = mm => d1(mm / 10);   // «40,0» — как принято в русском
+let iosGuess = '';
 function openCalib() {
   calV = pxmm(); calSrc = null; $('#calSlider').value = calV;
   const ar = screen.width / screen.height;   // подходящие по пропорциям модели — первыми
   const fit = MAC.map((m, i) => [m, i]).sort((a, b) => Math.abs(a[0][2] / a[0][3] - ar) - Math.abs(b[0][2] / b[0][3] - ar));
-  $('#calMac').innerHTML = '<option value="">— выбрать модель —</option>' +
-    fit.map(([m, i]) => `<option value="${i}">${m[0]}${Math.abs(m[2] / m[3] - ar) < 0.01 ? ' ✓ подходит' : ''}</option>`).join('');
+  const mac = `<optgroup label="Mac">${fit.map(([m, i]) => `<option value="m${i}">${m[0]}${Math.abs(m[2] / m[3] - ar) < 0.01 ? ' ✓ подходит' : ''}</option>`).join('')}</optgroup>`;
+  const sw = Math.min(screen.width, screen.height), sh = Math.max(screen.width, screen.height);
+  const ios = (pre, re) => IOS.map((m, i) => [m, i]).filter(([m]) => re.test(m[0]))
+    .map(([m, i]) => `<option value="i${i}">${m[0]}${m[1] === sw && m[2] === sh ? ' ✓ подходит' : ''}</option>`).join('');
+  const apple = `<optgroup label="iPhone">${ios('', /^iPhone/)}</optgroup><optgroup label="iPad">${ios('', /^iPad/)}</optgroup>`;
+  $('#calMac').innerHTML = '<option value="">— модель Apple —</option>' + (IS_IOS ? apple + mac : mac + apple);
+  // iPhone/iPad без калибровки: если по размеру экрана подходит ровно одна модель — сразу подставляем её (остаётся проверить картой и сохранить)
+  const one = IOS.map((m, i) => [m, i]).filter(([m]) => m[1] === sw && m[2] === sh);
+  if (IS_IOS && one.length === 1 && !calibFor()) { $('#calMac').value = 'i' + one[0][1]; $('#calMac').onchange({ target: $('#calMac') }); iosGuess = one[0][0][0]; }
+  $('#calPaste').hidden = IS_IOS;   // утилиты для iPhone/iPad нет
   drawCalib(); $('#calib').hidden = false;
 }
 function drawCalib() {
-  const ref = $('#calRef').value, card = $('#calCard'), rul = $('#calRuler');
-  card.hidden = ref !== 'card'; rul.hidden = ref !== 'ruler';
-  card.style.width = 85.6 * calV + 'px'; card.style.height = 53.98 * calV + 'px'; card.style.borderRadius = 3.18 * calV + 'px';
-  rul.style.width = 100 * calV + 'px';
+  const ref = $('#calRef').value, card = $('#calCard'), rul = $('#calRuler'), sheet = $('#calSheet'), stage = $('#calStage');
+  const sheetMode = ref === 'a4' || ref === 'a4l';
+  card.hidden = ref !== 'card'; rul.hidden = ref !== 'ruler'; sheet.hidden = !sheetMode;
+  $('#calib .mbox').classList.toggle('wide', sheetMode);
+  const room = stage.clientWidth || Math.min(innerWidth * 0.9, 820);
+  const vert = 85.6 * calV + 4 > room;                    // узкий экран (телефон) — карта вертикально
+  const [cw, ch] = vert ? [53.98, 85.6] : [85.6, 53.98];
+  card.style.width = cw * calV + 'px'; card.style.height = ch * calV + 'px'; card.style.borderRadius = 3.18 * calV + 'px';
+  const rmm = 100 * calV + 4 > room ? 50 : 100;           // линейка 10 см или 5 см, если не влезает
+  rul.style.width = rmm * calV + 'px';
   rul.style.backgroundImage = 'linear-gradient(to right,#333 1px,transparent 1px),linear-gradient(to right,#999 1px,transparent 1px)';
   rul.style.backgroundSize = `${10 * calV}px 18px, ${calV}px 8px`;
-  $('#calText').textContent = ref === 'card'
-    ? 'Приложите банковскую карту к рамке (левый верхний угол к углу) и двигайте ползунок, пока рамка не совпадёт с краями карты.'
-    : 'Приложите линейку: расстояние между крайними чертами должно быть ровно 10 см. Длинные риски — каждый сантиметр.';
+  const sw = ref === 'a4l' ? 297 : 210, shh = ref === 'a4l' ? 210 : 297;
+  sheet.style.width = sw * calV + 'px'; sheet.style.height = Math.min(shh * calV, innerHeight * 0.38) + 'px';
+  const tooWide = sheetMode && sw * calV > innerWidth - 20;
+  $('#calText').innerHTML = ref === 'card'
+    ? `Приложите банковскую карту к рамке${vert ? ' вертикально' : ''} (левый верхний угол к углу) и двигайте ползунок, пока рамка не совпадёт с краями карты.`
+    : sheetMode ? `Приложите лист А4 ${ref === 'a4l' ? 'длинной стороной' : 'короткой стороной'} к верхней границе рамки и подгоните ползунком ширину рамки ровно по краям листа (${sw} мм). Лист крупнее карты — ошибка меньше.`
+      + (tooWide ? ' <b>⚠ Лист шире окна — разверните окно или выберите другой вариант.</b>' : '')
+    : `Приложите линейку: расстояние между крайними чертами должно быть ровно ${rmm / 10} см. Длинные риски — каждый сантиметр.`;
   const cs = cssScreen(), w = cs.w / calV, h = cs.h / calV;
   $('#calInfo').textContent = `${calV.toFixed(3).replace('.', ',')} px/мм · экран ${cm(w)} × ${cm(h)} см (${d1(Math.hypot(w, h) / 25.4)}″)`;
   // блок автоопределения
-  const si = screenInfo(), e = matchEdid();
-  $('#calAuto').innerHTML = e && edidSane(e)
+  const si = screenInfo(), em = edidMatch(), e = em.e;
+  const pick = em.cands.length > 1 ? `<div style="margin-top:6px">Какой это монитор? <select id="calPick" style="width:auto"><option value="">— выберите —</option>`
+    + em.cands.map(c => `<option value="${esc(edidId(c))}"${e && edidId(c) === edidId(e) ? ' selected' : ''}>${esc(c.n || 'монитор')} — ${cm(c.w)} × ${cm(c.h)} см</option>`).join('') + '</select>'
+    + ('getScreenDetails' in window && !scrLabel ? ' <button id="calWm" type="button" style="width:auto" title="Браузер спросит разрешение «Управление окнами» и назовёт монитор, на котором окно">Спросить у браузера</button>' : '')
+    + (scrLabel ? ` <span class="hint">браузер называет его «${esc(scrLabel)}»</span>` : '') + '</div>' : '';
+  $('#calAuto').innerHTML = (e && edidSane(e)
     ? `✓ Данные монитора получены: <b>${esc(e.n || 'монитор')}</b>, панель ${cm(e.w)} × ${cm(e.h)} см, ${e.x}×${e.y}.`
       + (si.src !== 'edid' ? ' Сейчас используется ручная калибровка.' : ' Используются автоматически.')
+      + (edidRounded(e) ? '<br>ℹ Монитор сообщил размер, округлённый до сантиметра, — ошибка до 0,5 см на всю ширину. Для точности до миллиметра проверьте по карте или листу А4.' : '')
     : e ? '⚠ Монитор сообщил недостоверный размер (пропорции не сходятся) — используйте карту.'
+    : em.cands.length > 1 ? '⚠ Подходят несколько мониторов с одинаковым разрешением — выберите, на каком экране сейчас это окно.'
+    : IS_IOS && iosGuess && calSrc === 'model:' + iosGuess ? `Похоже, это <b>${esc(iosGuess)}</b> — модель уже выбрана в списке ниже. Проверьте по карте и нажмите «Сохранить».`
+    : IS_IOS ? 'На iPhone и iPad выберите модель в списке ниже — размер экрана известен точно. Затем проверьте по карте.'
     : edid.length ? '⚠ Данные мониторов есть, но этот экран среди них не найден (или выбран не родной режим). Запустите утилиту ещё раз.'
-    : 'Для максимальной точности запустите утилиту <b>detect-screen</b> из папки программы — она прочитает размер панели прямо из монитора (EDID). Затем нажмите здесь <kbd>Ctrl</kbd>+<kbd>V</kbd>.';
+    : 'Для максимальной точности запустите утилиту <b>detect-screen</b> из папки программы — она прочитает размер панели прямо из монитора (EDID). Затем нажмите здесь <kbd>Ctrl</kbd>+<kbd>V</kbd> или перетащите файл <b>screen-data.js</b> в окно.') + pick;
   $('#calReset').hidden = !calibFor();
 }
+$('#calAuto').addEventListener('click', async e => {
+  if (e.target.id !== 'calWm') return;
+  if (!(await readScreenLabel(true))) return toast('Браузер не дал узнать имя монитора — выберите его в списке');
+  const em = edidMatch(); calV = pxmm(); $('#calSlider').value = calV; drawCalib();
+  toast(em.e ? `Это «${em.e.n}» — размер подставлен` : `Браузер называет экран «${scrLabel}», но в данных мониторов такого имени нет — выберите вручную`, 5000);
+});
+$('#calAuto').addEventListener('change', e => {
+  if (e.target.id !== 'calPick') return;
+  if (e.target.value) picks[pickKey()] = e.target.value; else delete picks[pickKey()];
+  save(LS_PICK, picks); calV = pxmm(); $('#calSlider').value = calV; updateCalStatus(); drawCalib(); redraw();
+});
 $('#calSlider').oninput = e => { calV = +e.target.value; calSrc = 'card'; drawCalib(); };
 document.querySelectorAll('[data-cal]').forEach(b => b.onclick = () => { calV *= 1 + 0.001 * b.dataset.cal; calSrc = 'card'; $('#calSlider').value = calV; drawCalib(); });
 $('#calRef').onchange = drawCalib;
@@ -1336,8 +2212,11 @@ $('#calDiagBtn').onclick = () => {   // из диагонали: CSS-пиксе�
   const cs = cssScreen(); calV = Math.hypot(cs.w, cs.h) / (d * 25.4); calSrc = 'diag'; $('#calSlider').value = calV; drawCalib();
 };
 $('#calMac').onchange = e => {
-  const m = MAC[e.target.value]; if (!m) return;
-  calV = cssScreen().w / macWidthMm(m); calSrc = 'model:' + m[0]; $('#calSlider').value = calV; drawCalib();
+  const v = e.target.value, cs = cssScreen();
+  if (v[0] === 'm') { const m = MAC[v.slice(1)]; if (!m) return; calV = cs.w / macWidthMm(m); calSrc = 'model:' + m[0]; }
+  else if (v[0] === 'i') { const m = IOS[v.slice(1)]; if (!m) return; calV = Math.min(cs.w, cs.h) / iosWidthMm(m); calSrc = 'model:' + m[0]; }
+  else return;
+  $('#calSlider').value = calV; drawCalib();
 };
 $('#calReset').onclick = () => { dropCalib(); calV = pxmm(); $('#calSlider').value = calV; updateCalStatus(); drawCalib(); redraw(); };
 $('#calPaste').onclick = async () => {
@@ -1348,7 +2227,7 @@ $('#calCancel').onclick = () => $('#calib').hidden = true;
 $('#calSave').onclick = () => {
   if (calSrc) { // сохраняем только если пользователь действительно что-то подгонял
     const src = calSrc.startsWith('model:') ? 'model' : calSrc;
-    dropCalib(); calibs[scrKey()] = { v: calV, dpr: scr().d, src, name: calSrc.startsWith('model:') ? calSrc.slice(6) : '' };
+    dropCalib(); calibs[calibKey()] = { v: calV, dpr: scr().d, src, name: calSrc.startsWith('model:') ? calSrc.slice(6) : '' };
     save(LS_CALS, calibs);
   }
   $('#calib').hidden = true; updateCalStatus(); redraw();
@@ -1362,9 +2241,11 @@ function importScreenData(text) {
     dropCalib();                                          // свежие данные монитора важнее старой ручной подгонки
     calV = pxmm(); $('#calSlider').value = calV;
     updateCalStatus(); if (!$('#calib').hidden) drawCalib(); redraw();
-    const e = matchEdid();
+    const em = edidMatch(), e = em.e, n = `${arr.length} ${plural(arr.length, 'монитора', 'мониторов', 'мониторов')}`;
     alert(e ? `Готово! Монитор «${e.n || 'без имени'}»: ${cm(e.w)} × ${cm(e.h)} см. Масштаб 1:1 настроен автоматически.`
-            : `Получены данные ${arr.length} монитор(ов), но текущий экран не распознан. Убедитесь, что в системе выбрано рекомендуемое разрешение.`);
+      : em.cands.length > 1 ? `Получены данные ${n}. У нескольких одинаковое разрешение — выберите в окне «Калибровка», на каком из них сейчас это окно.`
+      : `Получены данные ${n}, но текущий экран не распознан. Убедитесь, что в системе выбрано рекомендуемое разрешение.`);
+    if (!e && em.cands.length > 1 && $('#calib').hidden) openCalib();
     return true;
   } catch { return false; }
 }
@@ -1372,11 +2253,12 @@ function updateCalStatus() {
   const el = $('#calStatus'), si = screenInfo(), cs = cssScreen();
   const size = `${cm(cs.w / si.v)} × ${cm(cs.h / si.v)} см`;
   el.className = 'status ' + (si.src === 'none' ? 'bad' : 'good');
-  el.innerHTML = si.src === 'edid' ? `✓ Определено автоматически по данным монитора «${esc(si.name || '?')}»: экран ${size}`
+  el.innerHTML = si.src === 'edid' ? `✓ Определено автоматически по данным монитора «${esc(si.name || '?')}»: экран ${size}` + (edidRounded(si.e) ? '. Монитор округлил размер до см — для точности проверьте по карте.' : '')
     : si.src === 'card' ? `✓ Откалибровано вручную: экран ${size}`
     : si.src === 'model' ? `✓ Модель «${esc(si.name)}»: экран ${size}`
     : si.src === 'diag' ? `✓ По диагонали: экран ${size}. Для точности до мм уточните по карте.`
     : si.bad ? '⚠ Монитор сообщил неверный размер. Откалибруйте по карте.'
+    : edidMatch().cands.length > 1 ? '⚠ Несколько мониторов с одинаковым разрешением. Откройте «Калибровку» и выберите, какой это экран.'
     : '⚠ Размер экрана не определён. Нажмите «Калибровка» — там есть автоопределение.';
 }
 /* =====================================================================
@@ -1401,22 +2283,112 @@ $('#btnPip').onclick = async () => {
 };
 
 /* =====================================================================
+   11б. ПЕЧАТЬ 1:1 — сцена режется на листы А4 в натуральную величину.
+   На каждом листе контрольная полоска 10 см: если она не 10 см — в окне печати выбран не «масштаб 100 %».
+   ===================================================================== */
+const A4 = { p: [190, 277], l: [277, 190] }, STRIP = 10, PPM = 4, PDS = 2;   // печатная область А4 при полях 10 мм; полоса подписей внизу, мм; px на мм; чёткость
+function printPlan() {
+  const keep = { W: S.W, H: S.H, panX: S.panX, panY: S.panY, persp: S.persp };
+  Object.assign(S, { printK: 1, W: 0, H: 0, panX: 0, panY: 0, persp: false });
+  const P = makeProj(), top = S.labels ? 14 : 5;
+  const boxes = S.objs.map(o => { const q = worldVerts(o).map(P), xs = q.map(p => p[0]), ys = q.map(p => p[1]);
+    return [Math.min(...xs) - 5, Math.min(...ys) - top, Math.max(...xs) + 5, Math.max(...ys) + 5]; });
+  if (S.bg.img) { const w = S.bg.img.width * S.bg.mpp, h = S.bg.img.height * S.bg.mpp; boxes.push([S.bg.x - w / 2, S.bg.y - h / 2, S.bg.x + w / 2, S.bg.y + h / 2]); }
+  Object.assign(S, keep); S.printK = 0;
+  const b = [Math.min(...boxes.map(q => q[0])), Math.min(...boxes.map(q => q[1])), Math.max(...boxes.map(q => q[2])), Math.max(...boxes.map(q => q[3]))],
+        w = b[2] - b[0], h = b[3] - b[1];
+  const opt = o => {
+    const pw = A4[o][0], ph = A4[o][1] - STRIP, c = Math.ceil(w / pw - 1e-6), r = Math.ceil(h / ph - 1e-6);
+    const x0 = b[0] - (c * pw - w) / 2, y0 = b[1] - (r * ph - h) / 2, tiles = [];   // сцена по центру сетки листов
+    for (let j = 0; j < r; j++) for (let i = 0; i < c; i++) {                         // пустые листы не печатаем
+      const t = [x0 + i * pw, y0 + j * ph, x0 + (i + 1) * pw, y0 + (j + 1) * ph];
+      if (boxes.some(q => q[0] < t[2] && q[2] > t[0] && q[1] < t[3] && q[3] > t[1])) tiles.push([i, j]);
+    }
+    return { o, pw, ph, c, r, x0, y0, tiles, n: tiles.length };
+  };
+  const a = opt('p'), l = opt('l');
+  return l.n < a.n ? l : a;
+}
+function isBlank(cvs) {
+  const d = cvs.getContext('2d').getImageData(0, 0, cvs.width, cvs.height).data;
+  for (let i = 0; i < d.length; i += 12) if (d[i] < 250 || d[i + 1] < 250 || d[i + 2] < 250) return false;
+  return true;
+}
+function printMarks(pl, c, r, idx, n) {
+  const k = PPM, W = pl.pw * k, H = pl.ph * k, multi = pl.c * pl.r > 1;
+  ctx.save(); ctx.setTransform(PDS, 0, 0, PDS, 0, 0);
+  ctx.setLineDash([3 * k, 2 * k]); ctx.strokeStyle = '#9A978F'; ctx.lineWidth = 1; ctx.strokeRect(0.5, 0.5, W - 1, H - 1); ctx.setLineDash([]);
+  const x0 = 2 * k, yb = H + 7.5 * k;                                   // контрольная полоска 10 см в нижней полосе
+  ctx.fillStyle = '#000'; ctx.fillRect(x0, yb, 100 * k, 1 * k);
+  for (let mm = 0; mm <= 100; mm += 5) { const t = mm % 10 ? 1.5 : 2.5; ctx.fillRect(x0 + mm * k - (mm === 100 ? 0.3 * k : 0), yb - t * k, 0.3 * k, t * k); }
+  const lines = [`Размер 1:1 · лист ${idx + 1} из ${n}` + (multi ? ` · ряд ${r + 1} из ${pl.r}, колонка ${c + 1} из ${pl.c}` : ''),
+    'Полоска слева — ровно 10 см? Если нет, печатайте в масштабе 100 %'];
+  if (multi) lines.push('Обрежьте поля по пунктиру и склейте листы встык по рядам и колонкам');
+  const tx = 106 * k, avail = W - tx - 2 * k;
+  let f = 2.4 * k; ctx.font = `${f}px system-ui,sans-serif`;
+  const wid = Math.max(...lines.map(s => ctx.measureText(s).width)); if (wid > avail) f *= avail / wid;
+  const step = lines.length > 2 ? 3 : 4, y1 = H + (lines.length > 2 ? 3.2 : 4) * k;
+  lines.forEach((s, i) => { ctx.font = `${i ? '' : '600 '}${f}px system-ui,sans-serif`; ctx.fillStyle = i ? '#55524C' : '#2C2C2B'; ctx.fillText(s, tx, y1 + i * step * k); });
+  ctx.restore();
+}
+function renderTile(pl, c, r) {
+  const cvs = document.createElement('canvas'), Wl = pl.pw * PPM, Hl = pl.ph * PPM, Hp = (pl.ph + STRIP) * PPM;
+  cvs.width = Wl * PDS; cvs.height = Hp * PDS;
+  const keep = { W: S.W, H: S.H, panX: S.panX, panY: S.panY, persp: S.persp }, kctx = ctx;
+  ctx = cvs.getContext('2d'); ctx.setTransform(PDS, 0, 0, PDS, 0, 0);
+  ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, Wl, Hp);
+  ctx.save(); ctx.beginPath(); ctx.rect(0, 0, Wl, Hl); ctx.clip();          // подписи объектов не залезают в нижнюю полосу
+  Object.assign(S, { printing: true, printK: PPM, W: Wl, H: Hl, persp: false,
+    panX: -(pl.x0 + c * pl.pw) * PPM - Wl / 2, panY: -(pl.y0 + r * pl.ph) * PPM - Hl / 2 });
+  try { render(); }
+  finally { ctx.restore(); ctx = kctx; Object.assign(S, keep); S.printing = false; S.printK = 0; }
+  return isBlank(cvs) ? null : { cvs, c, r };
+}
+function printPages(pl) {                  // → массив PNG (data URL) готовых листов
+  const tiles = pl.tiles.map(([c, r]) => renderTile(pl, c, r)).filter(Boolean), kctx = ctx;
+  try { return tiles.map((t, i) => { ctx = t.cvs.getContext('2d'); printMarks(pl, t.c, t.r, i, tiles.length); return t.cvs.toDataURL('image/png'); }); }
+  finally { ctx = kctx; }
+}
+function printHtml(pl, pages) {
+  const [w, h] = A4[pl.o];
+  return `<!doctype html><html lang="ru"><head><meta charset="utf-8"><title>Размер 1:1 — печать в натуральную величину</title><style>
+@page{size:A4 ${pl.o === 'l' ? 'landscape' : 'portrait'};margin:10mm}html,body{margin:0;padding:0;background:#fff}
+img{display:block;width:${w}mm;height:${h}mm;break-after:page;page-break-after:always}img:last-child{break-after:auto;page-break-after:auto}
+</style></head><body>${pages.map(src => `<img src="${src}" alt="">`).join('')}</body></html>`;
+}
+function printScene() {
+  if (!S.objs.length && !S.bg.img) return toast('Нечего печатать — добавьте объект');
+  const pl = printPlan();
+  if (pl.n > 12 && !confirm(`Сцена займёт до ${pl.n} ${plural(pl.n, 'листа', 'листов', 'листов')} А4 (сетка ${pl.c} × ${pl.r}). Печатать?\n\nСовет: уберите лишние объекты или включите вид «Спереди» / «Сверху».`)) return;
+  const pages = printPages(pl);
+  redraw();
+  if (!pages.length) return toast('Нечего печатать');
+  const fr = document.createElement('iframe');
+  fr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+  fr.srcdoc = printHtml(pl, pages);
+  fr.onload = async () => {
+    const w = fr.contentWindow;
+    await Promise.all([...w.document.images].map(im => im.complete ? 0 : new Promise(r => { im.onload = im.onerror = r; })));
+    w.focus(); w.print();
+    setTimeout(() => fr.remove(), 60000);
+  };
+  document.body.appendChild(fr);
+  toast(`Печать: ${pages.length} ${plural(pages.length, 'лист', 'листа', 'листов')} А4${pl.o === 'l' ? ' (альбомная)' : ''}. В окне печати — масштаб 100 %${pages.length > 1 ? '; листы склеивайте встык по пунктиру' : ''}`, 6000);
+}
+
+/* =====================================================================
    12. СТАРТ
    ===================================================================== */
 window.addEventListener('resize', redraw);
+if (window.visualViewport) visualViewport.addEventListener('resize', redraw);
 window.matchMedia && setInterval(() => { /* следим за сменой зума браузера/монитора */
-  const k = scrKey() + '/' + win().devicePixelRatio + '/' + win().screen.width; if (k !== S._scr) { S._scr = k; updateCalStatus(); redraw(); } }, 700);
+  const k = calibKey() + '/' + win().devicePixelRatio + '/' + win().screen.width; if (k !== S._scr) { S._scr = k; updateCalStatus(); redraw(); } }, 700);
 (function init() {
+  if (matchMedia('(max-width:760px)').matches) document.body.classList.add('compact');   // телефон: сначала весь экран под сцену
   const old = load(LS_CAL); if (old && !Object.keys(calibs).length) { calibs[scrKey()] = { ...old, src: 'card' }; save(LS_CALS, calibs); }
   const sc = load(LS_SCENE);
-  if (sc && sc.unit) $('#fUnit').value = sc.unit;
-  if (sc && typeof sc.vol === 'boolean') S.vol = sc.vol;
-  if (sc && typeof sc.lit === 'boolean') S.lit = sc.lit;
   $('#fVol').checked = S.vol; $('#fLit').checked = S.lit;
-  if (sc && sc.objs && sc.objs.length) {
-    sc.objs.forEach(o => { o.rgb = hex2rgb(o.color); o.mesh = buildMesh(o); S.nextId = Math.max(S.nextId, o.id + 1); });
-    S.objs = sc.objs;
-  } else {
+  if (!(loadScene(sc, false) && S.objs.length)) {
     addObj({ type: 'box', name: 'Мой объект', l: 150, w: 100, h: 80, color: PALETTE[0] });
     addObj({ name: PRESETS[0][0], type: 'box', l: 71.6, w: 7.8, h: 147.6, color: '#B9B6B0' });
     S.sel = null;
@@ -1424,7 +2396,9 @@ window.matchMedia && setInterval(() => { /* следим за сменой зу�
   ['#fL', '#fW', '#fH'].forEach((s, i) => $(s).value = fromMm([150, 100, 80][i]));
   $('#fExtH').value = fromMm(50);
   layout(true); renderList(); persist(); updateCalStatus(); redraw();
-  if (screenInfo().src === 'none') setTimeout(openCalib, 400);   // первый запуск — сразу калибровка
+  restorePhoto(); readScreenLabel(false);
+  if (/^#s=/.test(location.hash)) openFromHash();
+  else if (screenInfo().src === 'none') setTimeout(openCalib, 400);   // первый запуск — сразу калибровка
 })();
 </script>
 </body>
