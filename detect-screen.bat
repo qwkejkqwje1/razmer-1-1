@@ -18,7 +18,11 @@ $dir = Split-Path -Parent $env:R11_SELF
 function Parse-Edid([byte[]]$e) {
   if (-not $e -or $e.Length -lt 128) { return $null }
   if ($e[0] -ne 0 -or $e[1] -ne 255) { return $null }          # заголовок EDID 00 FF FF FF FF FF FF 00
-  $o = 54                                                      # первый Detailed Timing Descriptor
+  $o = 0                                                       # первый Detailed Timing Descriptor:
+  foreach ($d in 54, 72, 90, 108) {                             # у него pixel clock (2 байта) не 0,
+    if ($e[$d] -ne 0 -or $e[$d+1] -ne 0) { $o = $d; break }     # а 00 00 — это блок имени/диапазонов
+  }
+  if ($o -eq 0) { return $null }
   $x  = $e[$o+2]  + (($e[$o+4]  -band 0xF0) -shl 4)            # пикселей по горизонтали
   $y  = $e[$o+5]  + (($e[$o+7]  -band 0xF0) -shl 4)            # пикселей по вертикали
   $w  = $e[$o+12] + (($e[$o+14] -band 0xF0) -shl 4)            # ширина изображения, мм

@@ -64,6 +64,12 @@ kbd{font:11px ui-monospace,monospace;background:var(--sec);border:1px solid var(
 #calStage{margin:14px 0;min-height:120px;display:flex;align-items:flex-start}
 #calCard{border:2px solid var(--acc);border-radius:3.2mm;background:linear-gradient(135deg,#E5F2FC,#cfe3f7);position:relative}
 #calCard::after{content:"";position:absolute;left:12%;top:36%;width:14%;height:20%;border-radius:3px;background:#e6c770;opacity:.8}
+.vol{margin:8px 0 0;padding:6px 8px;border-radius:6px;background:var(--sec);font-size:12px}
+.vol b{font-weight:600}
+.fill{margin-top:10px;padding-top:8px;border-top:1px dashed var(--line)}
+.chk{display:flex!important;align-items:center;gap:6px;color:var(--ink)!important;font-size:13px!important;margin:4px 0!important}
+.chk input{margin:0}
+.obj small .x{color:var(--acc);font-weight:600}
 #calRuler{height:34px;border-bottom:2px solid #333;border-left:2px solid #333;border-right:2px solid #333;background-repeat:repeat-x;background-position:left bottom}
 </style>
 </head>
@@ -90,6 +96,7 @@ kbd{font:11px ui-monospace,monospace;background:var(--sec);border:1px solid var(
       <div><label>Ширина</label><input id="fW" type="number" min="0.1" step="any" value="150"></div>
       <div><label>Высота</label><input id="fH" type="number" min="0.1" step="any" value="100"></div>
     </div>
+    <div class="vol" id="fVolOut"></div>
     <p class="hint" id="fHint">Порядок как в магазинах: Д × Ш × В. Длина — влево-вправо, ширина — вглубь, высота — вверх.</p>
     <div class="row">
       <select id="fUnit" style="width:auto"><option value="mm">мм</option><option value="cm" selected>см</option></select>
@@ -97,6 +104,34 @@ kbd{font:11px ui-monospace,monospace;background:var(--sec);border:1px solid var(
       <button id="btnAdd" class="primary">Добавить</button>
       <button id="btnApply" disabled>Обновить выбранный</button>
     </div>
+  </details>
+
+  <details open><summary>Объём и литры</summary>
+    <div class="g2">
+      <div><label>Объём</label><input id="vVal" type="number" min="0" step="any" value="5"></div>
+      <div><label>Единицы</label><select id="vUnit"><option value="ml">мл</option><option value="l" selected>литры</option><option value="m3">м³</option></select></div>
+    </div>
+    <label>Какой формы</label>
+    <select id="vMode">
+      <option value="cube">Куб</option>
+      <option value="sph">Шар</option>
+      <option value="keep">Как «Новый объект» — те же пропорции</option>
+      <option value="height">Как «Новый объект» — Д и Ш те же, подобрать высоту</option>
+    </select>
+    <div class="vol" id="vOut"></div>
+    <div class="row"><button id="vAdd" class="primary">Показать объём</button><button id="vApply" disabled title="Пропорционально увеличить или уменьшить выбранный объект до этого объёма">Подогнать выбранный</button></div>
+    <div class="fill">
+      <label class="chk"><input id="fillOn" type="checkbox" disabled> 💧 Налить воду в выбранный объект</label>
+      <div id="fillBox" hidden>
+        <input id="fillPct" type="range" min="0" max="100" step="0.5" value="50">
+        <div class="g2">
+          <div><label>Налито, л</label><input id="fillL" type="number" min="0" step="any"></div>
+          <div><label>Стенки, мм</label><input id="fillWall" type="number" min="0" step="any" value="0"></div>
+        </div>
+      </div>
+      <div class="vol" id="fillOut" hidden></div>
+    </div>
+    <p class="hint">Объём считается по наружным размерам. У банки или кастрюли вместимость меньше — задайте толщину стенок.</p>
   </details>
 
   <details open><summary>Сравнить со знакомым предметом</summary>
@@ -128,6 +163,8 @@ kbd{font:11px ui-monospace,monospace;background:var(--sec);border:1px solid var(
       <label style="margin:0;color:var(--ink)"><input id="fGrid" type="checkbox" checked> Сетка</label>
       <label style="margin:0;color:var(--ink)"><input id="fLabels" type="checkbox" checked> Подписи</label>
       <label style="margin:0;color:var(--ink)"><input id="fDims" type="checkbox" checked> Размерные линии</label>
+      <label style="margin:0;color:var(--ink)"><input id="fVol" type="checkbox" checked> Объём в подписях</label>
+      <label style="margin:0;color:var(--ink)" title="Сетка через 10 см на коробках: один кубик 10×10×10 см = 1 литр"><input id="fLit" type="checkbox"> Литровые кубики</label>
     </div>
   </details>
 
@@ -190,6 +227,7 @@ kbd{font:11px ui-monospace,monospace;background:var(--sec);border:1px solid var(
     <li><b>Размер экрана (один раз).</b> Запустите <b>detect-screen</b> из папки программы — размер считается прямо из монитора. Для проверки приложите карту в окне «Калибровка».</li>
     <li><b>Объект.</b> Введите размеры товара (Д × Ш × В) → «Добавить». При виде «Спереди», ортографической камере и масштабе 1:1 передняя грань на экране точно равна реальной.</li>
     <li><b>Сравнение.</b> Поставьте рядом знакомый предмет: телефон, лист А4, банку колы.</li>
+    <li><b>Объём и литры.</b> Объём каждого объекта виден в списке и подписи. В блоке «Объём и литры» введите, например, 20 л — появится куб, шар или коробка ровно такого объёма. «💧 Налить воду» показывает уровень воды внутри выбранного объекта; «Литровые кубики» делят коробки на кубы 10 см = 1 л.</li>
     <li><b>Осмотр.</b> Тяните объект — передвинуть. По пустому месту: левая кнопка — вращать, правая (или <kbd>Shift</kbd>) — двигать, колесо — зум (<kbd>R</kbd> вернёт 1:1). <kbd>F</kbd> — режим полёта.</li>
     <li><b>Поверх браузера.</b> «📌 Поверх всех окон» открывает мини-окно, которое висит над магазином. Или вставьте скриншот товара <kbd>Ctrl</kbd>+<kbd>V</kbd>.</li>
   </ol>
@@ -231,7 +269,7 @@ const S = {
   objs: [], sel: null, nextId: 1,
   yaw: -0.6, pitch: 0.45, zoom: 1, panX: 0, panY: 0,
   persp: false, layout: 'row', alpha: 0.85,
-  grid: true, labels: true, dims: true,
+  grid: true, labels: true, dims: true, vol: true, lit: false,
   mode: 'view',                       // view | draw | measure
   draw: { pts: [], hover: null },
   measure: null,                      // {a:[x,y], b:[x,y]} в экранных px
@@ -259,27 +297,72 @@ const win = () => cv.ownerDocument.defaultView || window;   // окно, где 
 let calibs = load(LS_CALS) || {};                          // { "2560x1440": {v, dpr, src, name} }
 let edid = Array.isArray(window.SCREEN_EDID) ? window.SCREEN_EDID : (load(LS_EDID) || []);
 if (Array.isArray(window.SCREEN_EDID)) save(LS_EDID, edid);
+/* Зум страницы. ВАЖНО: в Chrome/Edge screen.width задан в «экранных» точках и от зума страницы НЕ зависит
+   (проверено: при зуме 150 % devicePixelRatio = 1.5, а screen.width прежний). В Firefox screen.width уже
+   в CSS-пикселях. Поэтому в Chromium CSS-пикселей на мм = screen.width / зум / ширина панели. */
+const OS_SCALES = [1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 3, 3.5, 4];
+const ZOOMS = [0.25, 1 / 3, 0.5, 2 / 3, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4, 5];
+const nearest = (list, v, tol) => { let b = null; for (const q of list) if (Math.abs(v / q - 1) <= tol && (b === null || Math.abs(v / q - 1) < Math.abs(v / b - 1))) b = q; return b; };
+const IS_FF = /Firefox\//.test(navigator.userAgent), IS_MAC = /Mac/.test(navigator.platform || navigator.userAgent);
+const near = (a, b) => Math.abs(a - b) <= 2;
+function rawScr() { const w = win(), s = w.screen; return { d: w.devicePixelRatio || 1, cw: s.width, ch: s.height }; }
+/* Оценка зума по окну: в Chromium outerWidth — в точках экрана, innerWidth — в CSS-пикселях */
+function zoomGuess() {
+  const w = win(), d = w.devicePixelRatio || 1;
+  const z = w.innerWidth > 0 ? nearest(ZOOMS, w.outerWidth / w.innerWidth, 0.03) : null;
+  return z && nearest(OS_SCALES, d / z, 0.01) ? z : null;          // devicePixelRatio = масштаб ОС × зум
+}
+function pageZoom(e) {
+  if (IS_FF) return 1;
+  const s = rawScr();
+  if (e && !IS_MAC) {                     // EDID в физических пикселях: screen.width × масштаб ОС = пиксели панели
+    const os = OS_SCALES.filter(k => near(s.cw * k, e.x));
+    if (os.length === 1) return s.d / os[0];
+  }
+  return zoomGuess() || 1;
+}
 function scr() {
-  const w = win(), d = w.devicePixelRatio || 1, s = w.screen;
-  return { d, cw: s.width, ch: s.height, nw: Math.round(s.width * d), nh: Math.round(s.height * d) };
+  const s = rawScr(), e = matchEdid(), z = pageZoom(e);
+  let nw = Math.round(s.cw * s.d / z), nh = Math.round(s.ch * s.d / z);   // nw×nh — физические пиксели экрана
+  if (e && !IS_MAC && near(nw, e.x) && near(nh, e.y)) { nw = e.x; nh = e.y; }   // screen.width округлён — берём точные из EDID
+  return { ...s, z, nw, nh };
 }
 const scrKey = () => { const s = scr(); return s.nw + 'x' + s.nh; };
+const legacyKey = () => { const s = rawScr(); return Math.round(s.cw * s.d) + 'x' + Math.round(s.ch * s.d); };  // как в прошлых версиях
+const keyNear = () => { const s = scr(); return Object.keys(calibs).find(k => { const [w, h] = k.split('x').map(Number); return near(w, s.nw) && near(h, s.nh); }); };
+const calibFor = () => calibs[scrKey()] || calibs[legacyKey()] || calibs[keyNear()];
+const dropCalib = () => { delete calibs[scrKey()]; delete calibs[legacyKey()]; const k = keyNear(); if (k) delete calibs[k]; save(LS_CALS, calibs); };
 /* Какая запись EDID соответствует экрану, на котором сейчас окно */
 function matchEdid() {
-  const s = scr(), near = (a, b) => Math.abs(a - b) <= 2;
-  const ok = e => e && e.w > 50 && e.h > 30 && e.x > 0 && e.y > 0;
-  let c = edid.filter(e => ok(e) && ((near(e.x, s.nw) && near(e.y, s.nh)) || (near(e.x, s.cw) && near(e.y, s.ch))));
-  if (!c.length) c = edid.filter(e => ok(e) && Math.abs(e.x / e.y - s.cw / s.ch) < 0.01); // масштабированный режим
-  if (new Set(c.map(e => e.w + 'x' + e.h)).size > 1) return null;                   // неоднозначно — не гадаем
-  return c[0] || null;
+  const s = rawScr(), ok = e => e && e.w > 50 && e.h > 30 && e.x > 0 && e.y > 0, size = e => e.w + 'x' + e.h;
+  const tiers = [
+    e => near(e.x, s.cw * s.d) && near(e.y, s.ch * s.d),                      // зум страницы 100 % (или Firefox)
+    e => OS_SCALES.some(k => near(e.x, s.cw * k) && near(e.y, s.ch * k)),   // Chrome/Edge с зумом; Mac — в точках
+    e => Math.abs(e.x / e.y - s.cw / s.ch) < 0.01,                          // масштабированный (не родной) режим
+  ];
+  for (const t of tiers) {
+    let c = edid.filter(e => ok(e) && t(e));
+    if (new Set(c.map(size)).size > 1) {                                     // неоднозначно — уточняем по зуму
+      const z = zoomGuess();
+      c = z ? c.filter(e => near(e.x, s.cw * s.d / z)) : [];
+      if (new Set(c.map(size)).size !== 1) return null;                     // не гадаем
+    }
+    if (c.length) return c[0];
+  }
+  return null;
 }
 /* Проверка достоверности EDID: пропорции мм должны совпадать с пропорциями пикселей */
 const edidSane = e => Math.abs((e.w / e.h) / (e.x / e.y) - 1) < 0.03;
+/* Размер экрана в CSS-пикселях при текущем зуме */
+const cssScreen = () => { const s = scr(); return { w: s.cw / s.z, h: s.ch / s.z }; };
 function screenInfo() {
-  const s = scr(), m = calibs[scrKey()];
+  const s = scr(), m = calibFor();
   if (m) return { v: m.v * m.dpr / s.d, src: m.src || 'card', name: m.name };
   const e = matchEdid();
-  if (e && edidSane(e)) return { v: s.cw / e.w, src: 'edid', name: e.n, e };
+  if (e && edidSane(e)) {
+    const css = !IS_MAC && s.nw === e.x ? e.x / s.d : s.cw / s.z;   // ширина экрана в CSS-пикселях
+    return { v: css / e.w, src: 'edid', name: e.n, e };
+  }
   return { v: 96 / 25.4, src: 'none', bad: e && !edidSane(e) ? e : null };
 }
 function pxmm() { return screenInfo().v; }
@@ -304,6 +387,20 @@ const PRESETS = [
   ['Футбольный мяч №5',           'sph', 220, 220, 220],
   ['Теннисный мяч',               'sph', 67, 67, 67],
 ];
+/* Для сравнения объёмов (наружные размеры, мм) */
+const PRESETS_VOL = [
+  ['Кубик 1 л (10 см)',            'box', 100, 100, 100],
+  ['Пакет молока 1 л',             'box', 95, 64, 166],
+  ['Литровая банка',               'cyl', 100, 100, 135],
+  ['Кастрюля 3 л',                 'cyl', 180, 180, 120],
+  ['Куб 10 л (21,5 см)',           'box', 215.44, 215.44, 215.44],
+  ['Городской рюкзак ≈25 л',       'box', 300, 180, 450],
+  ['Ручная кладь 55×40×20 см',     'box', 400, 200, 550],
+  ['Аквариум ≈60 л (60×30×35 см)', 'box', 600, 300, 350],
+  ['Куб 100 л (46,4 см)',          'box', 464.16, 464.16, 464.16],
+  ['Куб 1 м³ = 1000 л',            'box', 1000, 1000, 1000],
+];
+const ALL_PRESETS = PRESETS.concat(PRESETS_VOL);
 
 /* =====================================================================
    2. ГЕОМЕТРИЯ: построение сеток (вершины + грани)
@@ -365,10 +462,11 @@ function rotVerts(o) {
   return o.mesh.v.map(([x, y, z]) => [c * x + s * z, y, -s * x + c * z]);
 }
 /* Мировые координаты: поворот + место в раскладке (px, pz) + ручной сдвиг пользователем (ox, oy, oz) */
-function worldVerts(o) {
-  const dx = o.px + (o.ox || 0), dy = o.oy || 0, dz = o.pz + (o.oz || 0);
-  return rotVerts(o).map(([x, y, z]) => [x + dx, y + dy, z + dz]);
+function xform(o, verts) {
+  const c = Math.cos(o.rot), s = Math.sin(o.rot), dx = o.px + (o.ox || 0), dy = o.oy || 0, dz = o.pz + (o.oz || 0);
+  return verts.map(([x, y, z]) => [c * x + s * z + dx, y + dy, -s * x + c * z + dz]);
 }
+const worldVerts = o => xform(o, o.mesh.v);
 function bbox(pts) {
   const b = [Infinity, Infinity, Infinity, -Infinity, -Infinity, -Infinity];
   for (const p of pts) for (let k = 0; k < 3; k++) { if (p[k] < b[k]) b[k] = p[k]; if (p[k] > b[k + 3]) b[k + 3] = p[k]; }
@@ -518,12 +616,15 @@ function render() {
   if (S.grid && S.persp) drawFloor(P);
   const L = [-0.35, 0.75, 0.55], ll = Math.hypot(...L);
   for (const o of S.objs) {
-    const pv = worldVerts(o).map(P); o._pv = pv;
-    for (const f of o.mesh.f) {
+    const wv = worldVerts(o), pv = wv.map(P); o._pv = pv; o._wv = wv;
+    const liq = o.fill && o.fill.vol > 0 ? liquidMesh(o) : null; o._liq = liq;
+    const parts = [[o.mesh.f, pv, false]];
+    if (liq) parts.push([liq.f, xform(o, liq.v).map(P), true]);      // вода внутри — отдельная сетка
+    for (const [faces, mpv, wet] of parts) for (const f of faces) {
       const idx = f.i, n = idx.length; let d = 0, nx = 0, ny = 0, nz = 0;
-      if (S.persp && idx.some(i => pv[i][2] > nearZ)) continue;   // грань за камерой — не рисуем
+      if (S.persp && idx.some(i => mpv[i][2] > nearZ)) continue;   // грань за камерой — не рисуем
       for (let a = 0; a < n; a++) {                    // нормаль методом Ньюэлла
-        const p = pv[idx[a]], q = pv[idx[(a + 1) % n]];
+        const p = mpv[idx[a]], q = mpv[idx[(a + 1) % n]];
         d += p[2];
         nx += (p[4] - q[4]) * (p[2] + q[2]);
         ny += (p[2] - q[2]) * (p[3] + q[3]);
@@ -531,23 +632,31 @@ function render() {
       }
       const nl = Math.hypot(nx, ny, nz) || 1;
       const lit = 0.58 + 0.42 * Math.abs((nx * L[0] + ny * L[1] + nz * L[2]) / (nl * ll));
-      items.push({ o, f, d: d / n, lit });
+      items.push({ o, f, d: d / n, lit, pv: mpv, wet });
     }
   }
   items.sort((a, b) => a.d - b.d);
   ctx.lineJoin = 'round';
   for (const it of items) {
-    const { o, f } = it, pv = o._pv, sel = o.id === S.sel;
+    const { o, f, pv, wet } = it, sel = o.id === S.sel;
     ctx.beginPath();
     f.i.forEach((vi, k) => k ? ctx.lineTo(pv[vi][0], pv[vi][1]) : ctx.moveTo(pv[vi][0], pv[vi][1]));
     ctx.closePath();
-    ctx.globalAlpha = S.alpha;
-    ctx.fillStyle = shadeCol(o.rgb, it.lit); ctx.fill();
-    if (S.alpha > 0.97) { ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = 0.6; ctx.stroke(); } // убираем щели между гранями
-    // рёбра
-    ctx.globalAlpha = Math.min(1, S.alpha + 0.35);
-    ctx.strokeStyle = sel ? '#2783DE' : shadeCol(o.rgb, 0.45);
-    ctx.lineWidth = sel ? 2 : 1.2;
+    if (wet) {                                         // вода: полупрозрачная, поверхность чуть плотнее
+      ctx.globalAlpha = f.top ? 0.6 : 0.45;
+      ctx.fillStyle = shadeCol(WATER, it.lit); ctx.fill();
+      ctx.globalAlpha = 0.9; ctx.strokeStyle = '#1F6FC2'; ctx.lineWidth = f.top ? 1.5 : 0.8;
+    } else {
+      const a = o._liq ? Math.min(S.alpha, 0.28) : S.alpha;   // с водой объект становится «стеклянным»
+      ctx.globalAlpha = a;
+      ctx.fillStyle = shadeCol(o.rgb, it.lit); ctx.fill();
+      if (a > 0.97) { ctx.strokeStyle = ctx.fillStyle; ctx.lineWidth = 0.6; ctx.stroke(); } // убираем щели между гранями
+      if (S.lit && o.type === 'box') literGrid(o, f, P, a);
+      // рёбра
+      ctx.globalAlpha = Math.min(1, a + (o._liq ? 0.55 : 0.35));
+      ctx.strokeStyle = sel ? '#2783DE' : shadeCol(o.rgb, 0.45);
+      ctx.lineWidth = sel ? 2 : 1.2;
+    }
     ctx.beginPath();
     for (let k = 0; k < f.i.length; k++) {
       if (f.e && !f.e[k]) continue;
@@ -558,8 +667,8 @@ function render() {
   }
   ctx.globalAlpha = 1;
 
-  const selObj = S.objs.find(o => o.id === S.sel);
-  if (S.dims && selObj) drawDims(selObj, P);
+  const so = selObj();
+  if (S.dims && so) drawDims(so, P);
   if (S.labels) for (const o of S.objs) drawLabel(o);
   if (S.mode === 'draw') drawSketch();
   if (S.measure) drawMeasure();
@@ -567,6 +676,28 @@ function render() {
   updateHud();
 }
 
+/* «Литровые кубики»: линии через 10 см на гранях коробки (кубик 10×10×10 см = 1 л).
+   Линии считаются в координатах самого объекта от его угла, поэтому на соседних гранях совпадают. */
+function literGrid(o, f, P, alpha) {
+  if (100 * pxmm() * S.zoom < 5 || Math.max(o.l, o.w, o.h) > 20000) return;   // слишком мелко или огромно
+  const v = f.i.map(i => o.mesh.v[i]), ax = [0, 1, 2];
+  const mn = ax.map(k => Math.min(...v.map(p => p[k]))), mx = ax.map(k => Math.max(...v.map(p => p[k])));
+  const flat = ax.find(k => mx[k] - mn[k] < 1e-6); if (flat === undefined) return;
+  const start = [-o.l / 2, 0, -o.w / 2];
+  ctx.save(); ctx.globalAlpha = Math.min(1, alpha + 0.2); ctx.strokeStyle = shadeCol(o.rgb, 0.5); ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  for (const k of ax) {
+    if (k === flat) continue;
+    const other = 3 - k - flat;
+    for (let t = start[k] + 100; t < mx[k] - 0.5; t += 100) {
+      if (t <= mn[k] + 0.5) continue;
+      const a = [0, 0, 0], b = [0, 0, 0];
+      a[flat] = b[flat] = mn[flat]; a[k] = b[k] = t; a[other] = mn[other]; b[other] = mx[other];
+      const [A, B] = xform(o, [a, b]).map(P); ctx.moveTo(A[0], A[1]); ctx.lineTo(B[0], B[1]);
+    }
+  }
+  ctx.stroke(); ctx.restore();
+}
 /* Сетка 1:1 — миллиметры, сантиметры, 5 и 10 см */
 function drawGrid() {
   const k = pxmm() * S.zoom, [ox, oy] = origin(), { W, H } = S;
@@ -633,12 +764,12 @@ function tag(text, x, y, color, bg) {
 function drawLabel(o) {
   const pv = o._pv; let minY = Infinity, minX = Infinity, maxX = -Infinity;
   for (const p of pv) { if (p[1] < minY) minY = p[1]; if (p[0] < minX) minX = p[0]; if (p[0] > maxX) maxX = p[0]; }
-  tag(`${o.name}  ${fmt3(o)}`, (minX + maxX) / 2, minY - 16, o.id === S.sel ? '#2783DE' : '#2C2C2B');
+  const vol = S.vol ? '  ·  ' + fmtVol(volumeMm3(o)) + (o._liq ? '  ·  💧 ' + fmtVol(o._liq.V) : '') : '';
+  tag(`${o.name}  ${fmt3(o)}${vol}`, (minX + maxX) / 2, minY - 16, o.id === S.sel ? '#2783DE' : '#2C2C2B');
 }
 /* Размерные линии на выбранном объекте: длина, ширина, высота */
 function drawDims(o, P) {
-  const b = bbox(o.mesh.v), c = Math.cos(o.rot), s = Math.sin(o.rot);
-  const w = (x, y, z) => P([c * x + s * z + o.px, y, -s * x + c * z + o.pz]);
+  const b = bbox(o.mesh.v), w = (x, y, z) => P(xform(o, [[x, y, z]])[0]);
   const A = w(b[0], 0, b[5]), B = w(b[3], 0, b[5]), Hh = w(b[3], b[4], b[5]), Z = w(b[3], 0, b[2]);
   ctx.setLineDash([5, 4]); ctx.strokeStyle = '#2783DE'; ctx.lineWidth = 1.5;
   ctx.beginPath(); [[A, B], [B, Hh], [B, Z]].forEach(([p, q]) => { ctx.moveTo(p[0], p[1]); ctx.lineTo(q[0], q[1]); }); ctx.stroke();
@@ -701,6 +832,121 @@ const fmt = mm => num(fromMm(mm)) + (unit() === 'cm' ? ' см' : ' мм');
 const fmt3 = o => `${num(fromMm(o.l))}×${num(fromMm(o.w))}×${num(fromMm(o.h))} ${unit() === 'cm' ? 'см' : 'мм'}`;
 
 /* =====================================================================
+   5б. ОБЪЁМ И ЛИТРЫ
+   1 л = 1 дм³ = 1 000 000 мм³. Объём — по наружным размерам и точным формулам (не по граням сетки).
+   Любая фигура здесь — «основание × закон сечения по высоте»:
+   prism — сечение постоянно (коробка, цилиндр, чертёж), apex — сужается к вершине (конус, пирамида),
+   ell — эллипсоид (шар). Отсюда и объём до любой высоты — нужен, чтобы «налить воду».
+   ===================================================================== */
+const SHAPE = { box: 'Коробка', cyl: 'Цилиндр', cone: 'Конус', pyr: 'Пирамида', sph: 'Шар', ext: 'Чертёж' };
+const WATER = [74, 158, 235];
+const polyArea = pts => { let a = 0; for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) a += (pts[j][0] + pts[i][0]) * (pts[j][1] - pts[i][1]); return Math.abs(a) / 2; };
+const kindOf = t => t === 'cone' || t === 'pyr' ? 'apex' : t === 'sph' ? 'ell' : 'prism';
+function baseOf(type, l, w, pts) {                     // площадь основания, мм²
+  if (type === 'cyl' || type === 'cone' || type === 'sph') return Math.PI * l * w / 4;
+  if (type === 'ext') return pts ? polyArea(pts) : 0;
+  return l * w;                                        // коробка, пирамида
+}
+function volUpTo(kind, A, H, y) {                      // объём от дна до высоты y, мм³
+  if (!(H > 0) || !(A > 0)) return 0;
+  y = Math.max(0, Math.min(H, y));
+  if (kind === 'apex') return A * H / 3 * (1 - Math.pow(1 - y / H, 3));
+  if (kind === 'ell') { const b = H / 2; return A * (y - (Math.pow(y - b, 3) + b * b * b) / (3 * b * b)); }
+  return A * y;
+}
+const volumeMm3 = o => volUpTo(kindOf(o.type), baseOf(o.type, o.l, o.w, o.pts), o.h, o.h);
+const sig = (v, n = 3) => { if (!isFinite(v) || v <= 0) return '0'; const d = Math.max(0, n - 1 - Math.floor(Math.log10(v))); return (+v.toFixed(Math.min(d, 6))).toLocaleString('ru-RU'); };
+const fmtVol = mm3 => { const l = mm3 / 1e6; return l < 0.9995 ? sig(l * 1000) + ' мл' : l < 999.5 ? sig(l) + ' л' : sig(l / 1000) + ' м³'; };
+const fmtKg = kg => kg < 0.9995 ? sig(kg * 1000) + ' г' : kg < 999.5 ? sig(kg) + ' кг' : sig(kg / 1000) + ' т';
+const volLine = mm3 => `<b>${fmtVol(mm3)}</b>${mm3 >= 999.5e6 ? ` = ${Math.round(mm3 / 1e6).toLocaleString('ru-RU')} л` : ''} · столько воды весит ${fmtKg(mm3 / 1e6)}`;
+const near3 = o => Math.abs(o.l - o.w) < 0.01 && Math.abs(o.l - o.h) < 0.01;
+function describeShape(sh) {
+  if (sh.type === 'box' && near3(sh)) return 'куб со стороной ' + fmt(sh.l);
+  if (sh.type === 'sph' && near3(sh)) return 'шар диаметром ' + fmt(sh.l);
+  if ((sh.type === 'cyl' || sh.type === 'cone') && Math.abs(sh.l - sh.w) < 0.01) return `${SHAPE[sh.type].toLowerCase()}: диаметр ${fmt(sh.l)}, высота ${fmt(sh.h)}`;
+  return `${SHAPE[sh.type].toLowerCase()} ${fmt3(sh)}`;
+}
+function formDims() {
+  const l = toMm(+$('#fL').value), w = toMm(+$('#fW').value), h = toMm(+$('#fH').value);
+  return l > 0 && w > 0 && h > 0 ? { type: $('#fShape').value, l, w, h } : null;
+}
+function volTarget() {
+  const v = parseFloat(String($('#vVal').value).replace(',', '.')), k = { ml: 1e3, l: 1e6, m3: 1e9 }[$('#vUnit').value];
+  return v > 0 ? v * k : 0;
+}
+/* Размеры фигуры объёмом V (мм³) по выбранному способу */
+function shapeForVolume(V) {
+  const mode = $('#vMode').value;
+  if (!(V > 0)) return null;
+  if (mode === 'cube') { const a = Math.cbrt(V); return { type: 'box', l: a, w: a, h: a }; }
+  if (mode === 'sph') { const d = Math.cbrt(6 * V / Math.PI); return { type: 'sph', l: d, w: d, h: d }; }
+  const type = $('#fShape').value, l = toMm(+$('#fL').value), w = toMm(+$('#fW').value), h = toMm(+$('#fH').value);
+  if (!(l > 0 && w > 0)) return null;
+  if (mode === 'height') return { type, l, w, h: V / volumeMm3({ type, l, w, h: 1 }) };   // объём линеен по высоте
+  if (!(h > 0)) return null;
+  const k = Math.cbrt(V / volumeMm3({ type, l, w, h }));
+  return { type, l: l * k, w: w * k, h: h * k };
+}
+function updateVolUI() {
+  const f = formDims();
+  $('#fVolOut').innerHTML = f ? 'Объём: ' + volLine(volumeMm3(f)) : 'Объём: введите все три размера';
+  const V = volTarget(), sh = shapeForVolume(V);
+  $('#vOut').innerHTML = !V ? 'Введите объём больше нуля' : sh ? '→ ' + esc(describeShape(sh)) : 'Заполните Д и Ш в «Новом объекте»';
+  $('#vApply').disabled = !S.sel || !V;
+}
+/* ---------- Вода внутри объекта ----------
+   Полость = наружная форма минус стенки t: по бокам −2t, дно t (у конуса/пирамиды/шара и сверху t). */
+function cavity(o) {
+  const t = Math.max(0, (o.fill && o.fill.wall) || 0), kind = kindOf(o.type);
+  const l = Math.max(0, o.l - 2 * t), w = Math.max(0, o.w - 2 * t), H = Math.max(0, o.h - (kind === 'prism' ? t : 2 * t));
+  let poly;
+  if (o.type === 'ext') { const sx = o.l ? l / o.l : 0, sz = o.w ? w / o.w : 0; poly = o.pts.map(([x, z]) => [x * sx, z * sz]); }
+  else if (o.type === 'box' || o.type === 'pyr') poly = [[-l / 2, -w / 2], [l / 2, -w / 2], [l / 2, w / 2], [-l / 2, w / 2]];
+  else poly = ellipse(l / 2, w / 2, 48);
+  const A = baseOf(o.type, l, w, poly);
+  return { kind, poly, A, H, y0: t, cap: volUpTo(kind, A, H, H) };
+}
+function fillLevel(c, V) {                             // высота воды для объёма V (мм)
+  if (!(V > 0) || !(c.cap > 0)) return 0;
+  if (V >= c.cap) return c.H;
+  if (c.kind === 'prism') return V / c.A;
+  let lo = 0, hi = c.H;
+  for (let i = 0; i < 50; i++) { const m = (lo + hi) / 2; if (volUpTo(c.kind, c.A, c.H, m) < V) lo = m; else hi = m; }
+  return (lo + hi) / 2;
+}
+/* Сетка воды: горизонтальные слои сечения от дна до уровня y */
+function liquidMesh(o) {
+  const c = cavity(o), V = Math.min(o.fill.vol || 0, c.cap), y = fillLevel(c, V);
+  if (!(y > 0.01)) return null;
+  const sc = c.kind === 'apex' ? u => 1 - u / c.H : c.kind === 'ell' ? u => Math.sqrt(Math.max(0, 1 - Math.pow(2 * u / c.H - 1, 2))) : () => 1;
+  const N = c.kind === 'ell' ? Math.max(2, Math.ceil(y / c.H * 18)) : 1, n = c.poly.length, v = [], f = [];
+  for (let k = 0; k <= N; k++) { const u = y * k / N, s = sc(u); for (const [x, z] of c.poly) v.push([x * s, c.y0 + u, z * s]); }
+  const sideE = n === 4 ? [0, 1, 0, 1] : [0, 0, 0, 0];
+  f.push({ i: range(n).reverse(), e: Array(n).fill(0) });                 // дно
+  f.push({ i: range(n).map(j => N * n + j), e: null, top: true });        // поверхность воды
+  for (let k = 0; k < N; k++) for (let a = 0; a < n; a++) {
+    const b = (a + 1) % n, p = k * n, q = p + n;
+    f.push({ i: [p + a, p + b, q + b, q + a], e: sideE });
+  }
+  return { v, f, y, V, cap: c.cap };
+}
+const selObj = () => S.objs.find(o => o.id === S.sel);
+function updateFillUI() {
+  const o = selObj(), on = !!(o && o.fill), out = $('#fillOut');
+  $('#fillOn').disabled = !o; $('#fillOn').checked = on; $('#fillBox').hidden = !on; out.hidden = !on;
+  $('#fillOn').parentNode.title = o ? '' : 'Сначала выберите объект на сцене';
+  if (!on) return;
+  const c = cavity(o), V = Math.min(o.fill.vol, c.cap), y = fillLevel(c, V), act = document.activeElement;
+  if (act !== $('#fillL')) $('#fillL').value = +(V / 1e6).toFixed(3);
+  if (act !== $('#fillWall')) $('#fillWall').value = +(o.fill.wall || 0);
+  if (act !== $('#fillPct')) $('#fillPct').value = c.cap > 0 ? V / c.cap * 100 : 0;
+  out.innerHTML = c.cap > 0
+    ? `Уровень воды <b>${fmt(y)}</b> от дна · налито <b>${fmtVol(V)}</b> из ${fmtVol(c.cap)} (${Math.round(V / c.cap * 100)} %) · вес воды ${fmtKg(V / 1e6)}`
+      + (o.fill.vol > c.cap * 1.0005 ? '<br>⚠ Больше не помещается — вместимость ' + fmtVol(c.cap) : '')
+    : '⚠ Стенки толще самого объекта';
+}
+
+/* =====================================================================
    6. ОБЪЕКТЫ: добавление, изменение, список
    ===================================================================== */
 function addObj(p) {
@@ -712,18 +958,19 @@ function addObj(p) {
 function changed(retarget) { layout(retarget); renderList(); persist(); redraw(); }
 /* Сохранение сцены + история для отмены (Ctrl+Z) */
 const hist = [];
-const strip = ({ mesh, _pv, rgb, px, pz, ...r }) => r;
+const strip = ({ mesh, _pv, _wv, _liq, rgb, px, pz, ...r }) => r;
+const sceneData = snap => ({ objs: JSON.parse(snap), unit: unit(), vol: S.vol, lit: S.lit });
 function persist() {
   const snap = JSON.stringify(S.objs.map(strip));
   if (hist[hist.length - 1] !== snap) { hist.push(snap); if (hist.length > 80) hist.shift(); }
-  save(LS_SCENE, { objs: JSON.parse(snap), unit: unit() });
+  save(LS_SCENE, sceneData(snap));
 }
 function undo() {
   if (hist.length < 2) return;
   hist.pop(); const snap = hist[hist.length - 1], objs = JSON.parse(snap);
   objs.forEach(o => { o.rgb = hex2rgb(o.color); o.mesh = buildMesh(o); });
   S.objs = objs; if (!objs.some(o => o.id === S.sel)) S.sel = null;
-  layout(); renderList(); save(LS_SCENE, { objs: JSON.parse(snap), unit: unit() }); redraw();
+  layout(); renderList(); save(LS_SCENE, sceneData(snap)); redraw();
 }
 function setColor(id, color) {
   const o = S.objs.find(o => o.id === id); if (!o) return;
@@ -748,15 +995,18 @@ function applyToSelected() {
 }
 const esc = s => s.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 function renderList() {
+  const sv = selObj(), base = sv ? volumeMm3(sv) : 0;
+  const volTxt = o => { const v = volumeMm3(o); return ` · ${fmtVol(v)}` + (base && o !== sv ? ` · <span class="x" title="Во столько раз больше выбранного объекта по объёму">×${sig(v / base, 2)}</span>` : '') + (o.fill ? ' · 💧' : ''); };
   $('#list').innerHTML = S.objs.length ? S.objs.map(o => `
     <div class="obj ${o.id === S.sel ? 'sel' : ''}" data-id="${o.id}">
       <input type="color" class="sw" value="${o.color}" title="Цвет">
-      <div class="on"><b>${esc(o.name)}</b><small>${fmt3(o)}</small></div>
+      <div class="on"><b>${esc(o.name)}</b><small>${fmt3(o)}${volTxt(o)}</small></div>
       <button data-act="rot" title="Повернуть на 90°"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;vertical-align:-1px"><path d="M20 12a8 8 0 1 1-2.3-5.7"/><path d="M20 4v5h-5"/></svg></button>
       <button data-act="dup" title="Копия"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;vertical-align:-1px"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 4H6a2 2 0 0 0-2 2v10"/></svg></button>
       <button data-act="del" title="Удалить"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="pointer-events:none;vertical-align:-1px"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>`).join('') : '<p class="hint">Пока пусто — добавьте объект или пресет.</p>';
   $('#btnApply').disabled = !S.sel;
+  updateFillUI(); updateVolUI();
 }
 function select(id) {
   S.sel = id; const o = S.objs.find(o => o.id === id); if (o) fillForm(o);
@@ -955,14 +1205,16 @@ $('#fUnit').onchange = () => {   // пересчитываем введённы�
   ['#fL', '#fW', '#fH', '#fExtH'].forEach(s => $(s).value = +(+$(s).value * f).toFixed(2));
   renderList(); persist(); redraw();
 };
-$('#fPreset').innerHTML = PRESETS.map((p, i) => `<option value="${i}">${p[0]} — ${p[2]}×${p[3]}×${p[4]} мм</option>`).join('');
-$('#btnPreset').onclick = () => { const p = PRESETS[$('#fPreset').value]; addObj({ name: p[0], type: p[1], l: p[2], w: p[3], h: p[4], color: '#B9B6B0' }); };
+{ const n1 = v => (+v.toFixed(1)).toLocaleString('ru-RU'), opt = (p, i) => `<option value="${i}">${p[0]} — ${n1(p[2])}×${n1(p[3])}×${n1(p[4])} мм</option>`;
+  $('#fPreset').innerHTML = `<optgroup label="Предметы">${PRESETS.map(opt).join('')}</optgroup><optgroup label="Объём и литры">`
+    + PRESETS_VOL.map((p, i) => opt(p, PRESETS.length + i).replace(' мм</option>', ` мм · ${fmtVol(volumeMm3({ type: p[1], l: p[2], w: p[3], h: p[4] }))}</option>`)).join('') + '</optgroup>'; }
+$('#btnPreset').onclick = () => { const p = ALL_PRESETS[$('#fPreset').value]; addObj({ name: p[0], type: p[1], l: p[2], w: p[3], h: p[4], color: '#B9B6B0' }); };
 $('#list').onclick = e => {
   const row = e.target.closest('.obj'); if (!row) return; const id = +row.dataset.id, act = e.target.dataset.act;
   if (e.target.classList.contains('sw')) return;
   if (act === 'del') { S.sel = id; return delSelected(); }
   if (act === 'rot') { S.sel = id; return rotSelected(Math.PI / 2); }
-  if (act === 'dup') { const o = S.objs.find(o => o.id === id); const { mesh, _pv, id: _, ...c } = o; return addObj({ ...c, ox: 0, oy: 0, oz: 0, name: o.name + ' (копия)' }); }
+  if (act === 'dup') { const o = S.objs.find(o => o.id === id); const { mesh, _pv, _wv, _liq, id: _, ...c } = o; return addObj({ ...c, fill: o.fill ? { ...o.fill } : undefined, ox: 0, oy: 0, oz: 0, name: o.name + ' (копия)' }); }
   select(id);
 };
 $('#btnClear').onclick = () => { if (S.objs.length && confirm('Удалить все объекты?')) { S.objs = []; S.sel = null; changed(true); } };
@@ -981,6 +1233,33 @@ $('#fAlpha').oninput = e => { S.alpha = +e.target.value; redraw(); };
 $('#fGrid').onchange = e => { S.grid = e.target.checked; redraw(); };
 $('#fLabels').onchange = e => { S.labels = e.target.checked; redraw(); };
 $('#fDims').onchange = e => { S.dims = e.target.checked; redraw(); };
+$('#fVol').onchange = e => { S.vol = e.target.checked; persist(); redraw(); };
+$('#fLit').onchange = e => { S.lit = e.target.checked; persist(); redraw(); };
+['#fL', '#fW', '#fH', '#vVal'].forEach(q => $(q).addEventListener('input', updateVolUI));
+['#fShape', '#vUnit', '#vMode'].forEach(q => $(q).addEventListener('change', updateVolUI));
+$('#vAdd').onclick = () => {
+  const sh = shapeForVolume(volTarget()); if (!sh) return;
+  const m = $('#vMode').value, what = m === 'cube' ? 'куб' : m === 'sph' ? 'шар' : SHAPE[sh.type].toLowerCase();
+  addObj({ ...sh, name: `${String($('#vVal').value).replace('.', ',')} ${{ ml: 'мл', l: 'л', m3: 'м³' }[$('#vUnit').value]} — ${what}` });
+};
+$('#vApply').onclick = () => {                 // пропорционально масштабируем выбранный объект под объём
+  const o = selObj(), V = volTarget(); if (!o || !V) return;
+  const k = Math.cbrt(V / volumeMm3(o)); if (!(k > 0) || !isFinite(k)) return;
+  o.l *= k; o.w *= k; o.h *= k; if (o.pts) o.pts = o.pts.map(([x, z]) => [x * k, z * k]);
+  if (o.fill) o.fill = { ...o.fill, vol: o.fill.vol * k * k * k };
+  o.mesh = buildMesh(o); fillForm(o); changed();
+};
+const numIn = el => { const v = parseFloat(String(el.value).replace(',', '.')); return v > 0 ? v : 0; };
+$('#fillOn').onchange = e => {
+  const o = selObj(); if (!o) return;
+  if (e.target.checked) { o.fill = { vol: 0, wall: numIn($('#fillWall')) }; o.fill.vol = cavity(o).cap / 2; }
+  else delete o.fill;
+  renderList(); persist(); redraw();
+};
+$('#fillPct').oninput = e => { const o = selObj(); if (!o || !o.fill) return; o.fill.vol = cavity(o).cap * e.target.value / 100; updateFillUI(); redraw(); };
+$('#fillL').oninput = e => { const o = selObj(); if (!o || !o.fill) return; o.fill.vol = numIn(e.target) * 1e6; updateFillUI(); redraw(); };
+$('#fillWall').oninput = e => { const o = selObj(); if (!o || !o.fill) return; o.fill.wall = numIn(e.target); updateFillUI(); redraw(); };
+['#fillPct', '#fillL', '#fillWall'].forEach(q => $(q).addEventListener('change', () => { persist(); updateFillUI(); }));
 $('#btnDraw').onclick = () => setMode('draw');
 $('#btnMeasure').onclick = () => setMode('measure');
 $('#btnCompact').onclick = toggleCompact; $('#fabPanel').onclick = toggleCompact;
@@ -993,16 +1272,16 @@ $('#btnHelp').onclick = () => $('#help').hidden = false; $('#helpClose').onclick
 function setImage(file) {
   if (!file || !file.type.startsWith('image/')) return;
   const img = new Image();
-  img.onload = () => { const k = pxmm() * S.zoom; Object.assign(S.bg, { img, x: 0, y: 0, mpp: (S.H * 0.8 / k) / img.height }); redraw(); };
+  img.onload = () => { URL.revokeObjectURL(img.src); const k = pxmm() * S.zoom; Object.assign(S.bg, { img, x: 0, y: 0, mpp: (S.H * 0.8 / k) / img.height }); redraw(); };
   img.src = URL.createObjectURL(file);
 }
 $('#btnImg').onclick = () => $('#fImg').click();
 $('#fImg').onchange = e => setImage(e.target.files[0]);
 $('#btnImgDel').onclick = () => { S.bg.img = null; redraw(); };
 $('#fImgOp').oninput = e => { S.bg.op = +e.target.value; redraw(); };
-document.addEventListener('paste', e => { if (importScreenData(e.clipboardData?.getData('text'))) return; const it = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith('image/')); if (it) setImage(it.getAsFile()); });
-document.addEventListener('dragover', e => e.preventDefault());
-document.addEventListener('drop', e => { e.preventDefault(); setImage(e.dataTransfer.files[0]); });
+function onPaste(e) { if (importScreenData(e.clipboardData?.getData('text'))) return; const it = [...(e.clipboardData?.items || [])].find(i => i.type.startsWith('image/')); if (it) setImage(it.getAsFile()); }
+const onDragOver = e => e.preventDefault(), onDrop = e => { e.preventDefault(); setImage(e.dataTransfer.files[0]); };
+document.addEventListener('paste', onPaste); document.addEventListener('dragover', onDragOver); document.addEventListener('drop', onDrop);
 
 /* =====================================================================
    10. КАЛИБРОВКА
@@ -1018,6 +1297,7 @@ const MAC = [
   ['Apple Studio Display 27″', 27, 5120, 2880], ['Apple Pro Display XDR 32″', 32, 6016, 3384],
 ];
 const macWidthMm = m => m[2] * m[1] * 25.4 / Math.hypot(m[2], m[3]);
+const d1 = v => v.toFixed(1).replace('.', ','), cm = mm => d1(mm / 10);   // «40,0» — как принято в русском
 function openCalib() {
   calV = pxmm(); calSrc = null; $('#calSlider').value = calV;
   const ar = screen.width / screen.height;   // подходящие по пропорциям модели — первыми
@@ -1036,30 +1316,30 @@ function drawCalib() {
   $('#calText').textContent = ref === 'card'
     ? 'Приложите банковскую карту к рамке (левый верхний угол к углу) и двигайте ползунок, пока рамка не совпадёт с краями карты.'
     : 'Приложите линейку: расстояние между крайними чертами должно быть ровно 10 см. Длинные риски — каждый сантиметр.';
-  const w = screen.width / calV, h = screen.height / calV;
-  $('#calInfo').textContent = `${calV.toFixed(3)} px/мм · экран ${(w / 10).toFixed(1)} × ${(h / 10).toFixed(1)} см (${(Math.hypot(w, h) / 25.4).toFixed(1)}″)`;
+  const cs = cssScreen(), w = cs.w / calV, h = cs.h / calV;
+  $('#calInfo').textContent = `${calV.toFixed(3).replace('.', ',')} px/мм · экран ${cm(w)} × ${cm(h)} см (${d1(Math.hypot(w, h) / 25.4)}″)`;
   // блок автоопределения
   const si = screenInfo(), e = matchEdid();
   $('#calAuto').innerHTML = e && edidSane(e)
-    ? `✓ Данные монитора получены: <b>${esc(e.n || 'монитор')}</b>, панель ${(e.w / 10).toFixed(1)} × ${(e.h / 10).toFixed(1)} см, ${e.x}×${e.y}.`
+    ? `✓ Данные монитора получены: <b>${esc(e.n || 'монитор')}</b>, панель ${cm(e.w)} × ${cm(e.h)} см, ${e.x}×${e.y}.`
       + (si.src !== 'edid' ? ' Сейчас используется ручная калибровка.' : ' Используются автоматически.')
     : e ? '⚠ Монитор сообщил недостоверный размер (пропорции не сходятся) — используйте карту.'
     : edid.length ? '⚠ Данные мониторов есть, но этот экран среди них не найден (или выбран не родной режим). Запустите утилиту ещё раз.'
     : 'Для максимальной точности запустите утилиту <b>detect-screen</b> из папки программы — она прочитает размер панели прямо из монитора (EDID). Затем нажмите здесь <kbd>Ctrl</kbd>+<kbd>V</kbd>.';
-  $('#calReset').hidden = !calibs[scrKey()];
+  $('#calReset').hidden = !calibFor();
 }
 $('#calSlider').oninput = e => { calV = +e.target.value; calSrc = 'card'; drawCalib(); };
 document.querySelectorAll('[data-cal]').forEach(b => b.onclick = () => { calV *= 1 + 0.001 * b.dataset.cal; calSrc = 'card'; $('#calSlider').value = calV; drawCalib(); });
 $('#calRef').onchange = drawCalib;
 $('#calDiagBtn').onclick = () => {   // из диагонали: CSS-пикселей по диагонали / (дюймы × 25.4)
   const d = parseFloat(String($('#calDiag').value).replace(',', '.')); if (!(d > 0)) return;
-  calV = Math.hypot(screen.width, screen.height) / (d * 25.4); calSrc = 'diag'; $('#calSlider').value = calV; drawCalib();
+  const cs = cssScreen(); calV = Math.hypot(cs.w, cs.h) / (d * 25.4); calSrc = 'diag'; $('#calSlider').value = calV; drawCalib();
 };
 $('#calMac').onchange = e => {
   const m = MAC[e.target.value]; if (!m) return;
-  calV = screen.width / macWidthMm(m); calSrc = 'model:' + m[0]; $('#calSlider').value = calV; drawCalib();
+  calV = cssScreen().w / macWidthMm(m); calSrc = 'model:' + m[0]; $('#calSlider').value = calV; drawCalib();
 };
-$('#calReset').onclick = () => { delete calibs[scrKey()]; save(LS_CALS, calibs); calV = pxmm(); $('#calSlider').value = calV; updateCalStatus(); drawCalib(); redraw(); };
+$('#calReset').onclick = () => { dropCalib(); calV = pxmm(); $('#calSlider').value = calV; updateCalStatus(); drawCalib(); redraw(); };
 $('#calPaste').onclick = async () => {
   try { importScreenData(await navigator.clipboard.readText()); }
   catch { alert('Браузер не дал доступ к буферу. Просто нажмите Ctrl+V в этом окне.'); }
@@ -1068,7 +1348,7 @@ $('#calCancel').onclick = () => $('#calib').hidden = true;
 $('#calSave').onclick = () => {
   if (calSrc) { // сохраняем только если пользователь действительно что-то подгонял
     const src = calSrc.startsWith('model:') ? 'model' : calSrc;
-    calibs[scrKey()] = { v: calV, dpr: scr().d, src, name: calSrc.startsWith('model:') ? calSrc.slice(6) : '' };
+    dropCalib(); calibs[scrKey()] = { v: calV, dpr: scr().d, src, name: calSrc.startsWith('model:') ? calSrc.slice(6) : '' };
     save(LS_CALS, calibs);
   }
   $('#calib').hidden = true; updateCalStatus(); redraw();
@@ -1079,18 +1359,18 @@ function importScreenData(text) {
   const m = String(text || '').trim().match(/^R11:(\[.*\])$/s); if (!m) return false;
   try { const arr = JSON.parse(m[1]); if (!Array.isArray(arr)) return false;
     edid = arr; save(LS_EDID, edid);
-    delete calibs[scrKey()]; save(LS_CALS, calibs);       // свежие данные монитора важнее старой ручной подгонки
+    dropCalib();                                          // свежие данные монитора важнее старой ручной подгонки
     calV = pxmm(); $('#calSlider').value = calV;
     updateCalStatus(); if (!$('#calib').hidden) drawCalib(); redraw();
     const e = matchEdid();
-    alert(e ? `Готово! Монитор «${e.n || 'без имени'}»: ${(e.w / 10).toFixed(1)} × ${(e.h / 10).toFixed(1)} см. Масштаб 1:1 настроен автоматически.`
+    alert(e ? `Готово! Монитор «${e.n || 'без имени'}»: ${cm(e.w)} × ${cm(e.h)} см. Масштаб 1:1 настроен автоматически.`
             : `Получены данные ${arr.length} монитор(ов), но текущий экран не распознан. Убедитесь, что в системе выбрано рекомендуемое разрешение.`);
     return true;
   } catch { return false; }
 }
 function updateCalStatus() {
-  const el = $('#calStatus'), si = screenInfo(), s = scr();
-  const size = `${(s.cw / si.v / 10).toFixed(1)} × ${(s.ch / si.v / 10).toFixed(1)} см`;
+  const el = $('#calStatus'), si = screenInfo(), cs = cssScreen();
+  const size = `${cm(cs.w / si.v)} × ${cm(cs.h / si.v)} см`;
   el.className = 'status ' + (si.src === 'none' ? 'bad' : 'good');
   el.innerHTML = si.src === 'edid' ? `✓ Определено автоматически по данным монитора «${esc(si.name || '?')}»: экран ${size}`
     : si.src === 'card' ? `✓ Откалибровано вручную: экран ${size}`
@@ -1113,6 +1393,7 @@ $('#btnPip').onclick = async () => {
   pip.document.body.appendChild(wrap);
   ctx = cv.getContext('2d');
   pip.document.addEventListener('keydown', onKey); pip.document.addEventListener('keyup', onKeyUp);
+  pip.document.addEventListener('paste', onPaste); pip.document.addEventListener('dragover', onDragOver); pip.document.addEventListener('drop', onDrop);
   pip.addEventListener('resize', redraw);
   pip.addEventListener('pagehide', () => { home.appendChild(wrap); redraw(); });
   $('#btnPip').classList.add('on'); redraw();
@@ -1129,6 +1410,9 @@ window.matchMedia && setInterval(() => { /* следим за сменой зу�
   const old = load(LS_CAL); if (old && !Object.keys(calibs).length) { calibs[scrKey()] = { ...old, src: 'card' }; save(LS_CALS, calibs); }
   const sc = load(LS_SCENE);
   if (sc && sc.unit) $('#fUnit').value = sc.unit;
+  if (sc && typeof sc.vol === 'boolean') S.vol = sc.vol;
+  if (sc && typeof sc.lit === 'boolean') S.lit = sc.lit;
+  $('#fVol').checked = S.vol; $('#fLit').checked = S.lit;
   if (sc && sc.objs && sc.objs.length) {
     sc.objs.forEach(o => { o.rgb = hex2rgb(o.color); o.mesh = buildMesh(o); S.nextId = Math.max(S.nextId, o.id + 1); });
     S.objs = sc.objs;
